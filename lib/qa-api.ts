@@ -1,4 +1,12 @@
-import type { GenerateParams, GenerateResponse, SSEEvent, ChatMessage } from "@/types";
+import type {
+  ChatMessage,
+  ChatResponse,
+  Flashcard,
+  GenerateParams,
+  GenerateResponse,
+  MCQ,
+  SSEEvent,
+} from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const USER = process.env.NEXT_PUBLIC_QA_USER ?? "medisuccess";
@@ -59,22 +67,31 @@ export function startGenerationStream(
   return () => controller.abort();
 }
 
-export async function sendChatMessage(
-  jobId: string,
-  message: string,
-  history: ChatMessage[]
-): Promise<string> {
+export async function sendChatMessage(args: {
+  jobId: string;
+  mode: "mcq" | "flashcards";
+  message: string;
+  history: ChatMessage[];
+  currentMcqs: MCQ[];
+  currentFlashcards: Flashcard[];
+}): Promise<ChatResponse> {
   const res = await fetch(`${BASE}/qa/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: authHeader(),
     },
-    body: JSON.stringify({ job_id: jobId, message, history }),
+    body: JSON.stringify({
+      job_id: args.jobId,
+      mode: args.mode,
+      message: args.message,
+      history: args.history,
+      current_mcqs: args.currentMcqs,
+      current_flashcards: args.currentFlashcards,
+    }),
   });
   if (!res.ok) throw new Error(`Chat error ${res.status}`);
-  const data = await res.json();
-  return data.response as string;
+  return (await res.json()) as ChatResponse;
 }
 
 export function generateMarkdown(

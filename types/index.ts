@@ -46,3 +46,9 @@ export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
 }
+
+export interface ChatResponse {
+  message: string;
+  mcqs?: MCQ[];
+  flashcards?: Flashcard[];
+}

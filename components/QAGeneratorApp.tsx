@@ -83,8 +83,21 @@ export function QAGeneratorApp() {
     setChatHistory((h) => [...h, { role: "user", text: message }]);
     setChatLoading(true);
     try {
-      const reply = await sendChatMessage(jobId, message, chatHistory);
-      setChatHistory((h) => [...h, { role: "assistant", text: reply }]);
+      const reply = await sendChatMessage({
+        jobId,
+        mode: activeTab,
+        message,
+        history: chatHistory,
+        currentMcqs: mcqs,
+        currentFlashcards: flashcards,
+      });
+      if (reply.mcqs) setMcqs(reply.mcqs);
+      if (reply.flashcards) setFlashcards(reply.flashcards);
+      setRevealedIds(new Set());
+      setChatHistory((h) => [
+        ...h,
+        { role: "assistant", text: reply.message },
+      ]);
     } catch {
       setChatHistory((h) => [
         ...h,
