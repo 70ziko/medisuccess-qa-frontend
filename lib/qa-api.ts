@@ -12,8 +12,72 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const USER = process.env.NEXT_PUBLIC_QA_USER ?? "medisuccess";
 const PASS = process.env.NEXT_PUBLIC_QA_PASS ?? "";
 
+let promptedUser: string | null = null;
+let promptedPass: string | null = null;
+
+function hasStaticCredentials(): boolean {
+  return USER.trim().length > 0 && PASS.trim().length > 0;
+}
+
+function clearPromptedCredentials() {
+  promptedUser = null;
+  promptedPass = null;
+}
+
+function ensurePromptedCredentials(): { user: string; pass: string } {
+  if (promptedUser !== null && promptedPass !== null) {
+    return { user: promptedUser, pass: promptedPass };
+  }
+
+  if (typeof window === "undefined") {
+    throw new Error("Missing API credentials for basic auth");
+  }
+
+  const user = window.prompt("API username", USER)?.trim() ?? "";
+  const pass = window.prompt("API password") ?? "";
+
+  if (!user || !pass) {
+    throw new Error("Basic auth credentials are required");
+  }
+
+  promptedUser = user;
+  promptedPass = pass;
+  return { user, pass };
+}
+
 function authHeader(): string {
-  return "Basic " + btoa(`${USER}:${PASS}`);
+  if (hasStaticCredentials()) {
+    return "Basic " + btoa(`${USER}:${PASS}`);
+  }
+  const { user, pass } = ensurePromptedCredentials();
+  return "Basic " + btoa(`${user}:${pass}`);
+}
+
+async function fetchWithBasicAuth(
+  input: RequestInfo | URL,
+  init: RequestInit
+): Promise<Response> {
+  const first = await fetch(input, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Authorization: authHeader(),
+    },
+  });
+
+  if (first.status !== 401 || hasStaticCredentials()) {
+    return first;
+  }
+
+  clearPromptedCredentials();
+  const retried = await fetch(input, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Authorization: authHeader(),
+    },
+  });
+  return retried;
 }
 
 export function startGenerationStream(
@@ -27,9 +91,8 @@ export function startGenerationStream(
   if (file) form.append("file", file);
   form.append("params", JSON.stringify(params));
 
-  fetch(`${BASE}/qa/generate`, {
+  fetchWithBasicAuth(`${BASE}/qa/generate`, {
     method: "POST",
-    headers: { Authorization: authHeader() },
     body: form,
     signal: controller.signal,
   })
@@ -75,11 +138,10 @@ export async function sendChatMessage(args: {
   currentMcqs: MCQ[];
   currentFlashcards: Flashcard[];
 }): Promise<ChatResponse> {
-  const res = await fetch(`${BASE}/qa/chat`, {
+  const res = await fetchWithBasicAuth(`${BASE}/qa/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: authHeader(),
     },
     body: JSON.stringify({
       job_id: args.jobId,
@@ -99,14 +161,20 @@ export function generateMarkdown(
   flashcards: GenerateResponse["flashcards"]
 ): string {
   const mcqSection = [
-    "# Questions à choix multiples\n",
-    ...mcqs.map(
-      (q, i) =>
-        `## Q${i + 1}. ${q.question}\n\n` +
-        q.options.map((o) => `- **${o.label}.** ${o.text}`).join("\n") +
-        `\n\n**Réponse : ${q.correct_answer}**\n\n> ${q.explanation}` +
-        (q.source_reference ? `\n\n*Source : ${q.source_reference}*` : "")
-    ),
+    "# QCM\n",
+    ...mcqs.map((q, i) => {
+      const options = q.options
+        .map((o) => `- **${o.label}.** ${o.text}`)
+        .join("\n");
+      const corrections = q.options
+        .map((o) => `- **${o.label}.** ${o.justification}`)
+        .join("\n");
+      return (
+        `## Question ${i + 1}\n${q.question}\n\n` +
+        `### Réponses\n${options}\n\n` +
+        `### Correction\n${corrections}`
+      );
+    }),
   ].join("\n\n");
 
   const fcSection = [

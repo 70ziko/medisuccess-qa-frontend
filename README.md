@@ -34,3 +34,11 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+---
+
+create the prompts modularly depending on which difficulty is set, for example for hard questions we should ask to make tricky questions that can have some confusion for the student, etc.
+
+---
+
+if a pdf is used for the question generation we should add the option for automatic number of questions based on the amount of content present in the pdf, also we can't limit the number of pages used for question generation, the llm needs to work iteratively through the pdf and generate questions based on the content.

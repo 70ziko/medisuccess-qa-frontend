@@ -1,15 +1,16 @@
+export type MCQLabel = "A" | "B" | "C" | "D" | "E";
+
 export interface MCQOption {
-  label: "A" | "B" | "C" | "D";
+  label: MCQLabel;
   text: string;
+  is_correct: boolean;
+  justification: string;
 }
 
 export interface MCQ {
   id: string;
   question: string;
   options: MCQOption[];
-  correct_answer: "A" | "B" | "C" | "D";
-  explanation: string;
-  source_reference?: string;
 }
 
 export interface Flashcard {
