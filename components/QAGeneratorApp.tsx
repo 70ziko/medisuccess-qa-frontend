@@ -24,6 +24,8 @@ const DEFAULT_PARAMS: GenerateParams = {
   difficulty: "intermediate",
   mcq_count: 10,
   flashcard_count: 10,
+  mcq_adaptive: false,
+  flashcard_adaptive: false,
 };
 
 export function QAGeneratorApp() {

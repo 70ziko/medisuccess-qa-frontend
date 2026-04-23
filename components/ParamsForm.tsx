@@ -47,6 +47,75 @@ interface Props {
   onChange: (p: GenerateParams) => void;
 }
 
+function CountField({
+  label,
+  value,
+  adaptive,
+  onValueChange,
+  onAdaptiveChange,
+}: {
+  label: string;
+  value: number;
+  adaptive: boolean;
+  onValueChange: (n: number) => void;
+  onAdaptiveChange: (b: boolean) => void;
+}) {
+  return (
+    <div>
+      <label
+        style={{
+          fontSize: 11,
+          fontWeight: 500,
+          color: "var(--text-muted)",
+          display: "block",
+          marginBottom: 5,
+          letterSpacing: "0.02em",
+        }}
+      >
+        {label}
+      </label>
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          type="number"
+          min={1}
+          max={50}
+          value={adaptive ? "" : value}
+          disabled={adaptive}
+          placeholder={adaptive ? "Auto" : undefined}
+          onChange={(e) => onValueChange(Number(e.target.value))}
+          style={{
+            ...inputStyle,
+            flex: 1,
+            opacity: adaptive ? 0.55 : 1,
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => onAdaptiveChange(!adaptive)}
+          title="Let the generator pick a count based on document length"
+          style={{
+            padding: "0 10px",
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            border: adaptive
+              ? "1.5px solid var(--accent)"
+              : "1.5px solid var(--border)",
+            background: adaptive ? "var(--accent-light)" : "#F7F6F3",
+            color: adaptive ? "var(--accent)" : "var(--text-muted)",
+            cursor: "pointer",
+            fontFamily: "var(--font)",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
+          Auto
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ParamsForm({ params, onChange }: Props) {
   const set = <K extends keyof GenerateParams>(k: K, v: GenerateParams[K]) =>
     onChange({ ...params, [k]: v });
@@ -124,26 +193,20 @@ export function ParamsForm({ params, onChange }: Props) {
       </Field>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Field label="MCQ count">
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={params.mcq_count}
-            onChange={(e) => set("mcq_count", Number(e.target.value))}
-            style={inputStyle}
-          />
-        </Field>
-        <Field label="Flashcards">
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={params.flashcard_count}
-            onChange={(e) => set("flashcard_count", Number(e.target.value))}
-            style={inputStyle}
-          />
-        </Field>
+        <CountField
+          label="MCQ count"
+          value={params.mcq_count}
+          adaptive={params.mcq_adaptive}
+          onValueChange={(n) => set("mcq_count", n)}
+          onAdaptiveChange={(b) => set("mcq_adaptive", b)}
+        />
+        <CountField
+          label="Flashcards"
+          value={params.flashcard_count}
+          adaptive={params.flashcard_adaptive}
+          onValueChange={(n) => set("flashcard_count", n)}
+          onAdaptiveChange={(b) => set("flashcard_adaptive", b)}
+        />
       </div>
     </div>
   );

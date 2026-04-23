@@ -25,6 +25,8 @@ export interface GenerateParams {
   difficulty: "easy" | "intermediate" | "hard";
   mcq_count: number;
   flashcard_count: number;
+  mcq_adaptive: boolean;
+  flashcard_adaptive: boolean;
 }
 
 export interface GenerateResponse {
