@@ -35,15 +35,23 @@ export interface GenerateResponse {
   flashcards: Flashcard[];
 }
 
-export interface SSEEvent {
-  type: "progress" | "result" | "error";
-  step?: number;
-  total_steps?: number;
-  message?: string;
-  data?: GenerateResponse;
-}
+export type SSEEvent =
+  | {
+      type: "progress";
+      step?: number;
+      total_steps?: number;
+      message?: string;
+    }
+  | { type: "result"; data: GenerateResponse }
+  | { type: "flashcards_partial"; data: Flashcard[] }
+  | { type: "error"; message?: string };
 
-export type GenerationPhase = "idle" | "loading" | "done" | "error";
+export type GenerationPhase =
+  | "idle"
+  | "loading"
+  | "streaming"
+  | "done"
+  | "error";
 
 export interface ChatMessage {
   role: "user" | "assistant";

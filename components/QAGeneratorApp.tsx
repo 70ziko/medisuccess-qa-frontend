@@ -54,6 +54,9 @@ export function QAGeneratorApp() {
     setProgressStep(0);
     setProgressMsg("Initialisation…");
 
+    setMcqs([]);
+    setFlashcards([]);
+
     const stop = startGenerationStream(
       file,
       params,
@@ -62,7 +65,11 @@ export function QAGeneratorApp() {
           setProgressStep(event.step ?? 0);
           setProgressTotal(event.total_steps ?? 5);
           setProgressMsg(event.message ?? "");
-        } else if (event.type === "result" && event.data) {
+        } else if (event.type === "flashcards_partial") {
+          setFlashcards((prev) => [...prev, ...event.data]);
+          setPhase((p) => (p === "loading" ? "streaming" : p));
+          setActiveTab((t) => (t === "mcq" ? "flashcards" : t));
+        } else if (event.type === "result") {
           setMcqs(event.data.mcqs);
           setFlashcards(event.data.flashcards);
           setJobId(event.data.job_id);
@@ -189,7 +196,7 @@ export function QAGeneratorApp() {
 
           <button
             onClick={handleGenerate}
-            disabled={!isReady || phase === "loading"}
+            disabled={!isReady || phase === "loading" || phase === "streaming"}
             style={{
               marginTop: "auto",
               padding: "11px 0",
@@ -209,7 +216,7 @@ export function QAGeneratorApp() {
               letterSpacing: "-0.01em",
             }}
           >
-            {phase === "loading" ? (
+            {phase === "loading" || phase === "streaming" ? (
               <LoaderDots />
             ) : (
               <>
@@ -306,7 +313,7 @@ export function QAGeneratorApp() {
           </div>
         )}
 
-        {phase === "done" && (
+        {(phase === "done" || phase === "streaming") && (
           <>
             <OutputToolbar
               activeTab={activeTab}
@@ -334,16 +341,39 @@ export function QAGeneratorApp() {
                 }}
               >
                 {activeTab === "mcq" &&
-                  mcqs.map((item, i) => (
-                    <MCQCard
-                      key={item.id}
-                      item={item}
-                      index={i}
-                      revealed={revealedIds.has(item.id)}
-                      onReveal={(id) =>
-                        setRevealedIds((s) => new Set(Array.from(s).concat(id)))
-                      }
-                    />
+                  (phase === "streaming" ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        padding: "48px 0",
+                        color: "var(--text-muted)",
+                        fontSize: 13,
+                      }}
+                    >
+                      <LoaderDots />
+                      <span>
+                        {params.language === "fr"
+                          ? "Génération des questions…"
+                          : "Generating questions…"}
+                      </span>
+                    </div>
+                  ) : (
+                    mcqs.map((item, i) => (
+                      <MCQCard
+                        key={item.id}
+                        item={item}
+                        index={i}
+                        revealed={revealedIds.has(item.id)}
+                        onReveal={(id) =>
+                          setRevealedIds((s) =>
+                            new Set(Array.from(s).concat(id))
+                          )
+                        }
+                      />
+                    ))
                   ))}
 
                 {activeTab === "flashcards" && (
@@ -355,7 +385,11 @@ export function QAGeneratorApp() {
                         marginBottom: 12,
                       }}
                     >
-                      Click any card to reveal the answer
+                      {phase === "streaming"
+                        ? params.language === "fr"
+                          ? "Les cartes apparaissent pendant la génération des questions…"
+                          : "Cards appear as questions are generated…"
+                        : "Click any card to reveal the answer"}
                     </p>
                     {flashcards.map((item, i) => (
                       <FlashcardItem key={item.id} item={item} index={i} />
@@ -364,11 +398,13 @@ export function QAGeneratorApp() {
                 )}
               </div>
 
-              <ChatBar
-                history={chatHistory}
-                loading={chatLoading}
-                onSend={handleChatSend}
-              />
+              {phase === "done" && (
+                <ChatBar
+                  history={chatHistory}
+                  loading={chatLoading}
+                  onSend={handleChatSend}
+                />
+              )}
             </div>
           </>
         )}
