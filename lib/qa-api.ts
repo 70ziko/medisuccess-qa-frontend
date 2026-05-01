@@ -161,18 +161,17 @@ export function generateMarkdown(
   flashcards: GenerateResponse["flashcards"]
 ): string {
   const mcqSection = [
-    "# QCM\n",
-    ...mcqs.map((q, i) => {
+    ...mcqs.map((q) => {
       const options = q.options
-        .map((o) => `- **${o.label}.** ${o.text}`)
+        .map((o) => `${o.label}. ${o.text}`)
         .join("\n");
       const corrections = q.options
-        .map((o) => `- **${o.label}.** ${o.justification}`)
+        .map((o) => `${o.label}. ${o.justification}`)
         .join("\n");
       return (
-        `## Question ${i + 1}\n${q.question}\n\n` +
-        `### Réponses\n${options}\n\n` +
-        `### Correction\n${corrections}`
+        `# Question\n${q.question}\n\n` +
+        `# Réponses\n${options}\n\n` +
+        `# Corrections\n${corrections}`
       );
     }),
   ].join("\n\n");
