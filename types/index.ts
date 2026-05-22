@@ -63,3 +63,12 @@ export interface ChatResponse {
   mcqs?: MCQ[];
   flashcards?: Flashcard[];
 }
+
+export type MCQVariant = "hq" | "trial" | "qcu";
+
+export type Tab = "mcq" | "flashcards" | MCQVariant;
+
+export interface GenerateVariantResponse {
+  variant: MCQVariant;
+  mcqs: MCQ[];
+}

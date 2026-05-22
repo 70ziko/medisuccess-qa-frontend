@@ -4,7 +4,9 @@ import type {
   Flashcard,
   GenerateParams,
   GenerateResponse,
+  GenerateVariantResponse,
   MCQ,
+  MCQVariant,
   SSEEvent,
 } from "@/types";
 
@@ -154,6 +156,19 @@ export async function sendChatMessage(args: {
   });
   if (!res.ok) throw new Error(`Chat error ${res.status}`);
   return (await res.json()) as ChatResponse;
+}
+
+export async function generateVariant(
+  jobId: string,
+  variant: MCQVariant
+): Promise<GenerateVariantResponse> {
+  const res = await fetchWithBasicAuth(`${BASE}/qa/generate-variant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id: jobId, variant }),
+  });
+  if (!res.ok) throw new Error(`Variant error ${res.status}`);
+  return (await res.json()) as GenerateVariantResponse;
 }
 
 export function generateMarkdown(

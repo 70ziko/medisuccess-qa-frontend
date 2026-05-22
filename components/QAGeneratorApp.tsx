@@ -7,8 +7,14 @@ import type {
   GenerateParams,
   GenerationPhase,
   MCQ,
+  MCQVariant,
+  Tab,
 } from "@/types";
-import { sendChatMessage, startGenerationStream } from "@/lib/qa-api";
+import {
+  generateVariant,
+  sendChatMessage,
+  startGenerationStream,
+} from "@/lib/qa-api";
 import { PDFDropzone } from "./PDFDropzone";
 import { ParamsForm } from "./ParamsForm";
 import { GenerationProgress } from "./GenerationProgress";
@@ -39,10 +45,40 @@ export function QAGeneratorApp() {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [jobId, setJobId] = useState<string>("");
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<"mcq" | "flashcards">("mcq");
+  const [activeTab, setActiveTab] = useState<Tab>("mcq");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [variantMcqs, setVariantMcqs] = useState<Record<MCQVariant, MCQ[]>>({
+    hq: [],
+    trial: [],
+    qcu: [],
+  });
+  const [variantLoading, setVariantLoading] = useState<Record<MCQVariant, boolean>>(
+    { hq: false, trial: false, qcu: false }
+  );
+
+  const isVariantTab = (t: Tab): t is MCQVariant =>
+    t === "hq" || t === "trial" || t === "qcu";
+
+  const handleTabChange = useCallback(
+    (t: Tab) => {
+      setActiveTab(t);
+      if (!isVariantTab(t)) return;
+      if (variantMcqs[t].length > 0 || variantLoading[t]) return;
+      if (!jobId) return;
+      setVariantLoading((s) => ({ ...s, [t]: true }));
+      generateVariant(jobId, t)
+        .then((res) =>
+          setVariantMcqs((s) => ({ ...s, [t]: res.mcqs }))
+        )
+        .catch((err: Error) => setErrorMsg(err.message))
+        .finally(() =>
+          setVariantLoading((s) => ({ ...s, [t]: false }))
+        );
+    },
+    [jobId, variantMcqs, variantLoading]
+  );
 
   const isReady = file !== null || params.topic.trim().length > 0;
 
@@ -94,7 +130,7 @@ export function QAGeneratorApp() {
     try {
       const reply = await sendChatMessage({
         jobId,
-        mode: activeTab,
+        mode: activeTab === "flashcards" ? "flashcards" : "mcq",
         message,
         history: chatHistory,
         currentMcqs: mcqs,
@@ -124,6 +160,9 @@ export function QAGeneratorApp() {
     setFlashcards([]);
     setChatHistory([]);
     setRevealedIds(new Set());
+    setVariantMcqs({ hq: [], trial: [], qcu: [] });
+    setVariantLoading({ hq: false, trial: false, qcu: false });
+    setActiveTab("mcq");
   };
 
   return (
@@ -317,7 +356,7 @@ export function QAGeneratorApp() {
           <>
             <OutputToolbar
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              onTabChange={handleTabChange}
               mcqs={mcqs}
               flashcards={flashcards}
               revealedCount={revealedIds.size}
@@ -396,6 +435,54 @@ export function QAGeneratorApp() {
                     ))}
                   </>
                 )}
+
+                {isVariantTab(activeTab) &&
+                  (variantLoading[activeTab] ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 10,
+                        padding: "48px 0",
+                        color: "var(--text-muted)",
+                        fontSize: 13,
+                      }}
+                    >
+                      <LoaderDots />
+                      <span>
+                        {params.language === "fr"
+                          ? "Génération…"
+                          : "Generating…"}
+                      </span>
+                    </div>
+                  ) : variantMcqs[activeTab].length === 0 ? (
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text-muted)",
+                        padding: "24px 0",
+                      }}
+                    >
+                      {params.language === "fr"
+                        ? "Aucune question pour l'instant."
+                        : "No questions yet."}
+                    </p>
+                  ) : (
+                    variantMcqs[activeTab].map((item, i) => (
+                      <MCQCard
+                        key={item.id}
+                        item={item}
+                        index={i}
+                        revealed={revealedIds.has(item.id)}
+                        onReveal={(id) =>
+                          setRevealedIds((s) =>
+                            new Set(Array.from(s).concat(id))
+                          )
+                        }
+                      />
+                    ))
+                  ))}
               </div>
 
               {phase === "done" && (

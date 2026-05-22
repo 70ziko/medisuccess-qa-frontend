@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { MCQ, Flashcard } from "@/types";
+import type { MCQ, Flashcard, Tab } from "@/types";
 import { Icon, IconBtn, Pill } from "./Icons";
 import { downloadMarkdown, generateMarkdown } from "@/lib/qa-api";
 
 interface Props {
-  activeTab: "mcq" | "flashcards";
-  onTabChange: (t: "mcq" | "flashcards") => void;
+  activeTab: Tab;
+  onTabChange: (t: Tab) => void;
   mcqs: MCQ[];
   flashcards: Flashcard[];
   revealedCount: number;
@@ -59,6 +59,9 @@ export function OutputToolbar({
           [
             ["mcq", "MCQ"],
             ["flashcards", "Flashcards"],
+            ["hq", "MCQ – HQ"],
+            ["trial", "Trial"],
+            ["qcu", "QCU"],
           ] as const
         ).map(([id, label]) => (
           <button
