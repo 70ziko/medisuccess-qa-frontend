@@ -2,32 +2,39 @@
 
 import { useState } from "react";
 import type { MCQ, Flashcard, Tab } from "@/types";
-import { Icon, IconBtn, Pill } from "./Icons";
-import { downloadMarkdown, generateMarkdown } from "@/lib/qa-api";
+import { Icon, IconBtn, LoaderDots, Pill } from "./Icons";
+import { downloadTabMarkdown, tabMarkdown } from "@/lib/qa-api";
 
 interface Props {
   activeTab: Tab;
   onTabChange: (t: Tab) => void;
-  mcqs: MCQ[];
+  /** MCQ list backing the active tab (variant tabs have their own list). */
+  activeMcqs: MCQ[];
   flashcards: Flashcard[];
   revealedCount: number;
   topic: string;
   onClear: () => void;
+  /** Re-run generation for the active tab (variant tabs only). */
+  onRegenerate?: () => void;
+  regenerating?: boolean;
 }
 
 export function OutputToolbar({
   activeTab,
   onTabChange,
-  mcqs,
+  activeMcqs,
   flashcards,
   revealedCount,
   topic,
   onClear,
+  onRegenerate,
+  regenerating,
 }: Props) {
   const [copied, setCopied] = useState(false);
+  const isFlashcards = activeTab === "flashcards";
 
   const handleCopy = () => {
-    const md = generateMarkdown(mcqs, flashcards);
+    const md = tabMarkdown(activeTab, activeMcqs, flashcards);
     navigator.clipboard.writeText(md).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -87,23 +94,38 @@ export function OutputToolbar({
         ))}
       </div>
 
-      {/* Stats */}
+      {/* Stats — scoped to the active tab */}
       <div style={{ display: "flex", gap: 8, marginLeft: 6 }}>
-        <Pill color="accent">{mcqs.length} questions</Pill>
-        <Pill color="green">{flashcards.length} cards</Pill>
-        {revealedCount > 0 && (
-          <Pill color="muted">
-            {revealedCount}/{mcqs.length} revealed
-          </Pill>
+        {isFlashcards ? (
+          <Pill color="green">{flashcards.length} cards</Pill>
+        ) : (
+          <>
+            <Pill color="accent">{activeMcqs.length} questions</Pill>
+            {revealedCount > 0 && (
+              <Pill color="muted">
+                {revealedCount}/{activeMcqs.length} revealed
+              </Pill>
+            )}
+          </>
         )}
       </div>
 
-      {/* Actions */}
+      {/* Actions — operate on the active tab */}
       <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-        <IconBtn onClick={onClear} title="Clear">
+        {onRegenerate && (
+          <IconBtn
+            onClick={() => {
+              if (!regenerating) onRegenerate();
+            }}
+            title="Regenerate this tab with the current count"
+          >
+            {regenerating ? <LoaderDots /> : <Icon name="sparkle" size={14} />}
+          </IconBtn>
+        )}
+        <IconBtn onClick={onClear} title="Clear all">
           <Icon name="refresh" size={14} />
         </IconBtn>
-        <IconBtn onClick={handleCopy} title="Copy markdown">
+        <IconBtn onClick={handleCopy} title="Copy this tab as markdown">
           {copied ? (
             <Icon name="check" size={14} />
           ) : (
@@ -111,8 +133,10 @@ export function OutputToolbar({
           )}
         </IconBtn>
         <IconBtn
-          onClick={() => downloadMarkdown(mcqs, flashcards, topic)}
-          title="Download markdown"
+          onClick={() =>
+            downloadTabMarkdown(activeTab, activeMcqs, flashcards, topic)
+          }
+          title="Download this tab as markdown"
         >
           <Icon name="download" size={14} />
         </IconBtn>

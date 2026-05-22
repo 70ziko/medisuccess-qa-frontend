@@ -8,6 +8,7 @@ import type {
   MCQ,
   MCQVariant,
   SSEEvent,
+  Tab,
 } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -139,6 +140,7 @@ export async function sendChatMessage(args: {
   history: ChatMessage[];
   currentMcqs: MCQ[];
   currentFlashcards: Flashcard[];
+  variant?: MCQVariant;
 }): Promise<ChatResponse> {
   const res = await fetchWithBasicAuth(`${BASE}/qa/chat`, {
     method: "POST",
@@ -152,6 +154,7 @@ export async function sendChatMessage(args: {
       history: args.history,
       current_mcqs: args.currentMcqs,
       current_flashcards: args.currentFlashcards,
+      variant: args.variant ?? null,
     }),
   });
   if (!res.ok) throw new Error(`Chat error ${res.status}`);
@@ -160,23 +163,27 @@ export async function sendChatMessage(args: {
 
 export async function generateVariant(
   jobId: string,
-  variant: MCQVariant
+  variant: MCQVariant,
+  targetCount?: number,
+  adaptive = false
 ): Promise<GenerateVariantResponse> {
   const res = await fetchWithBasicAuth(`${BASE}/qa/generate-variant`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_id: jobId, variant }),
+    body: JSON.stringify({
+      job_id: jobId,
+      variant,
+      target_count: adaptive ? null : targetCount ?? null,
+      adaptive,
+    }),
   });
   if (!res.ok) throw new Error(`Variant error ${res.status}`);
   return (await res.json()) as GenerateVariantResponse;
 }
 
-export function generateMarkdown(
-  mcqs: GenerateResponse["mcqs"],
-  flashcards: GenerateResponse["flashcards"]
-): string {
-  const mcqSection = [
-    ...mcqs.map((q) => {
+export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {
+  return mcqs
+    .map((q) => {
       const options = q.options
         .map((o) => `${o.label}. ${o.text}`)
         .join("\n");
@@ -188,31 +195,54 @@ export function generateMarkdown(
         `# Réponses\n${options}\n\n` +
         `# Corrections\n${corrections}`
       );
-    }),
-  ].join("\n\n");
+    })
+    .join("\n\n");
+}
 
-  const fcSection = [
-    "\n---\n\n# Flashcards\n",
+export function flashcardMarkdown(
+  flashcards: GenerateResponse["flashcards"]
+): string {
+  return [
+    "# Flashcards\n",
     ...flashcards.map(
       (f, i) =>
         `### #${String(i + 1).padStart(2, "0")} ${f.front}\n\n${f.back}`
     ),
   ].join("\n\n");
-
-  return mcqSection + fcSection;
 }
 
-export function downloadMarkdown(
+/** Markdown for a single tab, in that tab's correct format. */
+export function tabMarkdown(
+  tab: Tab,
+  mcqs: GenerateResponse["mcqs"],
+  flashcards: GenerateResponse["flashcards"]
+): string {
+  return tab === "flashcards"
+    ? flashcardMarkdown(flashcards)
+    : mcqMarkdown(mcqs);
+}
+
+const TAB_FILE_SLUG: Record<Tab, string> = {
+  mcq: "mcq",
+  flashcards: "flashcards",
+  hq: "mcq-hq",
+  trial: "trial",
+  qcu: "qcu",
+};
+
+export function downloadTabMarkdown(
+  tab: Tab,
   mcqs: GenerateResponse["mcqs"],
   flashcards: GenerateResponse["flashcards"],
   topic: string
 ) {
-  const md = generateMarkdown(mcqs, flashcards);
+  const md = tabMarkdown(tab, mcqs, flashcards);
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `qa-${topic.replace(/\s+/g, "-").toLowerCase() || "generated"}.md`;
+  const slug = topic.replace(/\s+/g, "-").toLowerCase() || "generated";
+  a.download = `qa-${slug}-${TAB_FILE_SLUG[tab]}.md`;
   a.click();
   URL.revokeObjectURL(url);
 }

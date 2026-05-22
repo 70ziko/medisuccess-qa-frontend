@@ -10,6 +10,7 @@ import type {
   MCQVariant,
   Tab,
 } from "@/types";
+import { VARIANT_ADAPTIVE_KEY, VARIANT_COUNT_KEY } from "@/types";
 import {
   generateVariant,
   sendChatMessage,
@@ -32,7 +33,24 @@ const DEFAULT_PARAMS: GenerateParams = {
   flashcard_count: 10,
   mcq_adaptive: false,
   flashcard_adaptive: false,
+  hq_count: 10,
+  trial_count: 6,
+  qcu_count: 10,
+  hq_adaptive: false,
+  trial_adaptive: false,
+  qcu_adaptive: false,
 };
+
+const ALL_TABS: Tab[] = ["mcq", "flashcards", "hq", "trial", "qcu"];
+
+const emptyHistories = (): Record<Tab, ChatMessage[]> =>
+  Object.fromEntries(ALL_TABS.map((t) => [t, [] as ChatMessage[]])) as Record<
+    Tab,
+    ChatMessage[]
+  >;
+
+const emptyLoading = (): Record<Tab, boolean> =>
+  Object.fromEntries(ALL_TABS.map((t) => [t, false])) as Record<Tab, boolean>;
 
 export function QAGeneratorApp() {
   const [file, setFile] = useState<File | null>(null);
@@ -46,8 +64,12 @@ export function QAGeneratorApp() {
   const [jobId, setJobId] = useState<string>("");
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<Tab>("mcq");
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [chatLoading, setChatLoading] = useState(false);
+  const [chatHistories, setChatHistories] = useState<Record<Tab, ChatMessage[]>>(
+    emptyHistories
+  );
+  const [chatLoadingTab, setChatLoadingTab] = useState<Record<Tab, boolean>>(
+    emptyLoading
+  );
   const [errorMsg, setErrorMsg] = useState("");
   const [variantMcqs, setVariantMcqs] = useState<Record<MCQVariant, MCQ[]>>({
     hq: [],
@@ -61,23 +83,31 @@ export function QAGeneratorApp() {
   const isVariantTab = (t: Tab): t is MCQVariant =>
     t === "hq" || t === "trial" || t === "qcu";
 
+  const runVariant = useCallback(
+    (t: MCQVariant) => {
+      if (!jobId) return;
+      setVariantLoading((s) => ({ ...s, [t]: true }));
+      generateVariant(
+        jobId,
+        t,
+        params[VARIANT_COUNT_KEY[t]],
+        params[VARIANT_ADAPTIVE_KEY[t]]
+      )
+        .then((res) => setVariantMcqs((s) => ({ ...s, [t]: res.mcqs })))
+        .catch((err: Error) => setErrorMsg(err.message))
+        .finally(() => setVariantLoading((s) => ({ ...s, [t]: false })));
+    },
+    [jobId, params]
+  );
+
   const handleTabChange = useCallback(
     (t: Tab) => {
       setActiveTab(t);
       if (!isVariantTab(t)) return;
       if (variantMcqs[t].length > 0 || variantLoading[t]) return;
-      if (!jobId) return;
-      setVariantLoading((s) => ({ ...s, [t]: true }));
-      generateVariant(jobId, t)
-        .then((res) =>
-          setVariantMcqs((s) => ({ ...s, [t]: res.mcqs }))
-        )
-        .catch((err: Error) => setErrorMsg(err.message))
-        .finally(() =>
-          setVariantLoading((s) => ({ ...s, [t]: false }))
-        );
+      runVariant(t);
     },
-    [jobId, variantMcqs, variantLoading]
+    [variantMcqs, variantLoading, runVariant]
   );
 
   const isReady = file !== null || params.topic.trim().length > 0;
@@ -86,12 +116,14 @@ export function QAGeneratorApp() {
     if (!isReady) return;
     setPhase("loading");
     setRevealedIds(new Set());
-    setChatHistory([]);
+    setChatHistories(emptyHistories());
+    setChatLoadingTab(emptyLoading());
     setProgressStep(0);
     setProgressMsg("Initialisation…");
 
     setMcqs([]);
     setFlashcards([]);
+    setVariantMcqs({ hq: [], trial: [], qcu: [] });
 
     const stop = startGenerationStream(
       file,
@@ -125,31 +157,40 @@ export function QAGeneratorApp() {
   }, [file, params, isReady]);
 
   const handleChatSend = async (message: string) => {
-    setChatHistory((h) => [...h, { role: "user", text: message }]);
-    setChatLoading(true);
+    // Snapshot the tab so the reply lands on the thread it was sent from,
+    // even if the user switches tabs mid-request.
+    const tab = activeTab;
+    const variant = isVariantTab(tab) ? tab : undefined;
+    const tabMcqs = variant ? variantMcqs[variant] : mcqs;
+    const appendToTab = (msg: ChatMessage) =>
+      setChatHistories((h) => ({ ...h, [tab]: [...h[tab], msg] }));
+
+    appendToTab({ role: "user", text: message });
+    setChatLoadingTab((s) => ({ ...s, [tab]: true }));
     try {
       const reply = await sendChatMessage({
         jobId,
-        mode: activeTab === "flashcards" ? "flashcards" : "mcq",
+        mode: tab === "flashcards" ? "flashcards" : "mcq",
         message,
-        history: chatHistory,
-        currentMcqs: mcqs,
+        history: chatHistories[tab],
+        currentMcqs: tabMcqs,
         currentFlashcards: flashcards,
+        variant,
       });
-      if (reply.mcqs) setMcqs(reply.mcqs);
+      if (reply.mcqs) {
+        if (variant) {
+          setVariantMcqs((s) => ({ ...s, [variant]: reply.mcqs! }));
+        } else {
+          setMcqs(reply.mcqs);
+        }
+      }
       if (reply.flashcards) setFlashcards(reply.flashcards);
       setRevealedIds(new Set());
-      setChatHistory((h) => [
-        ...h,
-        { role: "assistant", text: reply.message },
-      ]);
+      appendToTab({ role: "assistant", text: reply.message });
     } catch {
-      setChatHistory((h) => [
-        ...h,
-        { role: "assistant", text: "Une erreur est survenue." },
-      ]);
+      appendToTab({ role: "assistant", text: "Une erreur est survenue." });
     } finally {
-      setChatLoading(false);
+      setChatLoadingTab((s) => ({ ...s, [tab]: false }));
     }
   };
 
@@ -158,12 +199,16 @@ export function QAGeneratorApp() {
     setFile(null);
     setMcqs([]);
     setFlashcards([]);
-    setChatHistory([]);
+    setChatHistories(emptyHistories());
+    setChatLoadingTab(emptyLoading());
     setRevealedIds(new Set());
     setVariantMcqs({ hq: [], trial: [], qcu: [] });
     setVariantLoading({ hq: false, trial: false, qcu: false });
     setActiveTab("mcq");
   };
+
+  // MCQ list backing the active tab (variant tabs have their own list).
+  const activeMcqs = isVariantTab(activeTab) ? variantMcqs[activeTab] : mcqs;
 
   return (
     <div
@@ -357,11 +402,19 @@ export function QAGeneratorApp() {
             <OutputToolbar
               activeTab={activeTab}
               onTabChange={handleTabChange}
-              mcqs={mcqs}
+              activeMcqs={activeMcqs}
               flashcards={flashcards}
               revealedCount={revealedIds.size}
               topic={params.topic}
               onClear={handleClear}
+              onRegenerate={
+                isVariantTab(activeTab)
+                  ? () => runVariant(activeTab)
+                  : undefined
+              }
+              regenerating={
+                isVariantTab(activeTab) ? variantLoading[activeTab] : false
+              }
             />
 
             <div
@@ -487,8 +540,9 @@ export function QAGeneratorApp() {
 
               {phase === "done" && (
                 <ChatBar
-                  history={chatHistory}
-                  loading={chatLoading}
+                  key={activeTab}
+                  history={chatHistories[activeTab]}
+                  loading={chatLoadingTab[activeTab]}
                   onSend={handleChatSend}
                 />
               )}

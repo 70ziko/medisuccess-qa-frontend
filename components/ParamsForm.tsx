@@ -2,6 +2,19 @@
 
 import type { GenerateParams } from "@/types";
 
+const DIFFICULTY_COLORS: Record<
+  GenerateParams["difficulty"],
+  { light: string; border: string; text: string }
+> = {
+  easy: { light: "var(--green-light)", border: "var(--green-border)", text: "var(--green)" },
+  intermediate: {
+    light: "var(--amber-light)",
+    border: "var(--amber-border)",
+    text: "var(--amber)",
+  },
+  hard: { light: "var(--red-light)", border: "var(--red-border)", text: "var(--red)" },
+};
+
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "8px 10px",
@@ -92,7 +105,7 @@ function CountField({
         <button
           type="button"
           onClick={() => onAdaptiveChange(!adaptive)}
-          title="Let the generator pick a count based on document length"
+          data-tooltip="Let the generator pick a count based on document length"
           style={{
             padding: "0 10px",
             borderRadius: 6,
@@ -158,37 +171,34 @@ export function ParamsForm({ params, onChange }: Props) {
 
       <Field label="Difficulty">
         <div style={{ display: "flex", gap: 6 }}>
-          {(["easy", "intermediate", "hard"] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => set("difficulty", d)}
-              style={{
-                flex: 1,
-                padding: "6px 0",
-                borderRadius: 6,
-                fontSize: 11.5,
-                fontWeight: 500,
-                border:
-                  params.difficulty === d
-                    ? "1.5px solid var(--accent)"
+          {(["easy", "intermediate", "hard"] as const).map((d) => {
+            const c = DIFFICULTY_COLORS[d];
+            const selected = params.difficulty === d;
+            return (
+              <button
+                key={d}
+                onClick={() => set("difficulty", d)}
+                style={{
+                  flex: 1,
+                  padding: "6px 0",
+                  borderRadius: 6,
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  border: selected
+                    ? `1.5px solid ${c.border}`
                     : "1.5px solid var(--border)",
-                background:
-                  params.difficulty === d
-                    ? "var(--accent-light)"
-                    : "#F7F6F3",
-                color:
-                  params.difficulty === d
-                    ? "var(--accent)"
-                    : "var(--text-muted)",
-                cursor: "pointer",
-                fontFamily: "var(--font)",
-                transition: "all .15s",
-                textTransform: "capitalize",
-              }}
-            >
-              {d}
-            </button>
-          ))}
+                  background: selected ? c.light : "#F7F6F3",
+                  color: selected ? c.text : "var(--text-muted)",
+                  cursor: "pointer",
+                  fontFamily: "var(--font)",
+                  transition: "all .15s",
+                  textTransform: "capitalize",
+                }}
+              >
+                {d}
+              </button>
+            );
+          })}
         </div>
       </Field>
 
@@ -206,6 +216,44 @@ export function ParamsForm({ params, onChange }: Props) {
           adaptive={params.flashcard_adaptive}
           onValueChange={(n) => set("flashcard_count", n)}
           onAdaptiveChange={(b) => set("flashcard_adaptive", b)}
+        />
+      </div>
+
+      <label
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--text-muted)",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          display: "block",
+          marginBottom: -6,
+        }}
+      >
+        Variant counts
+      </label>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <CountField
+          label="MCQ – HQ"
+          value={params.hq_count}
+          adaptive={params.hq_adaptive}
+          onValueChange={(n) => set("hq_count", n)}
+          onAdaptiveChange={(b) => set("hq_adaptive", b)}
+        />
+        <CountField
+          label="Trial"
+          value={params.trial_count}
+          adaptive={params.trial_adaptive}
+          onValueChange={(n) => set("trial_count", n)}
+          onAdaptiveChange={(b) => set("trial_adaptive", b)}
+        />
+        <CountField
+          label="QCU"
+          value={params.qcu_count}
+          adaptive={params.qcu_adaptive}
+          onValueChange={(n) => set("qcu_count", n)}
+          onAdaptiveChange={(b) => set("qcu_adaptive", b)}
         />
       </div>
     </div>

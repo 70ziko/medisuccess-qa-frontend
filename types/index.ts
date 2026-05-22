@@ -27,6 +27,13 @@ export interface GenerateParams {
   flashcard_count: number;
   mcq_adaptive: boolean;
   flashcard_adaptive: boolean;
+  // Per-variant target counts for the on-demand variant tabs.
+  hq_count: number;
+  trial_count: number;
+  qcu_count: number;
+  hq_adaptive: boolean;
+  trial_adaptive: boolean;
+  qcu_adaptive: boolean;
 }
 
 export interface GenerateResponse {
@@ -72,3 +79,23 @@ export interface GenerateVariantResponse {
   variant: MCQVariant;
   mcqs: MCQ[];
 }
+
+/** Maps a variant tab to its count field in GenerateParams. */
+export const VARIANT_COUNT_KEY: Record<
+  MCQVariant,
+  "hq_count" | "trial_count" | "qcu_count"
+> = {
+  hq: "hq_count",
+  trial: "trial_count",
+  qcu: "qcu_count",
+};
+
+/** Maps a variant tab to its adaptive ("Auto") flag in GenerateParams. */
+export const VARIANT_ADAPTIVE_KEY: Record<
+  MCQVariant,
+  "hq_adaptive" | "trial_adaptive" | "qcu_adaptive"
+> = {
+  hq: "hq_adaptive",
+  trial: "trial_adaptive",
+  qcu: "qcu_adaptive",
+};

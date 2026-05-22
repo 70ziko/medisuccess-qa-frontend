@@ -109,7 +109,7 @@ export function IconBtn({
   return (
     <button
       onClick={onClick}
-      title={title}
+      data-tooltip={title}
       style={{
         width: 30,
         height: 30,
