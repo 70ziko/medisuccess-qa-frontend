@@ -4,7 +4,7 @@ import type {
   Flashcard,
   GenerateParams,
   GenerateResponse,
-  GenerateVariantResponse,
+  GenerateSectionResponse,
   MCQ,
   MCQVariant,
   SSEEvent,
@@ -161,24 +161,25 @@ export async function sendChatMessage(args: {
   return (await res.json()) as ChatResponse;
 }
 
-export async function generateVariant(
+/** Generate a single section on demand (any tab) for an existing job. */
+export async function generateSection(
   jobId: string,
-  variant: MCQVariant,
+  section: Tab,
   targetCount?: number,
   adaptive = false
-): Promise<GenerateVariantResponse> {
-  const res = await fetchWithBasicAuth(`${BASE}/qa/generate-variant`, {
+): Promise<GenerateSectionResponse> {
+  const res = await fetchWithBasicAuth(`${BASE}/qa/generate-section`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       job_id: jobId,
-      variant,
+      section,
       target_count: adaptive ? null : targetCount ?? null,
       adaptive,
     }),
   });
-  if (!res.ok) throw new Error(`Variant error ${res.status}`);
-  return (await res.json()) as GenerateVariantResponse;
+  if (!res.ok) throw new Error(`Section error ${res.status}`);
+  return (await res.json()) as GenerateSectionResponse;
 }
 
 export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {

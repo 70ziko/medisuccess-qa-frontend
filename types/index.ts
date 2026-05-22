@@ -34,6 +34,13 @@ export interface GenerateParams {
   hq_adaptive: boolean;
   trial_adaptive: boolean;
   qcu_adaptive: boolean;
+  // Per-section "generate on the first pass?" toggles. Sections left off are
+  // generated later on demand via the per-tab Generate button.
+  mcq_enabled: boolean;
+  flashcard_enabled: boolean;
+  hq_enabled: boolean;
+  trial_enabled: boolean;
+  qcu_enabled: boolean;
 }
 
 export interface GenerateResponse {
@@ -51,6 +58,7 @@ export type SSEEvent =
     }
   | { type: "result"; data: GenerateResponse }
   | { type: "flashcards_partial"; data: Flashcard[] }
+  | { type: "variant_result"; variant: MCQVariant; data: MCQ[] }
   | { type: "error"; message?: string };
 
 export type GenerationPhase =
@@ -75,9 +83,12 @@ export type MCQVariant = "hq" | "trial" | "qcu";
 
 export type Tab = "mcq" | "flashcards" | MCQVariant;
 
-export interface GenerateVariantResponse {
-  variant: MCQVariant;
-  mcqs: MCQ[];
+/** On-demand generation of a single section. Exactly one of the result fields
+ *  is populated, depending on the section kind. */
+export interface GenerateSectionResponse {
+  section: Tab;
+  mcqs?: MCQ[];
+  flashcards?: Flashcard[];
 }
 
 /** Maps a variant tab to its count field in GenerateParams. */
@@ -98,4 +109,52 @@ export const VARIANT_ADAPTIVE_KEY: Record<
   hq: "hq_adaptive",
   trial: "trial_adaptive",
   qcu: "qcu_adaptive",
+};
+
+/** Maps any tab to its count field in GenerateParams. */
+export const TAB_COUNT_KEY: Record<
+  Tab,
+  | "mcq_count"
+  | "flashcard_count"
+  | "hq_count"
+  | "trial_count"
+  | "qcu_count"
+> = {
+  mcq: "mcq_count",
+  flashcards: "flashcard_count",
+  hq: "hq_count",
+  trial: "trial_count",
+  qcu: "qcu_count",
+};
+
+/** Maps any tab to its adaptive ("Auto") flag in GenerateParams. */
+export const TAB_ADAPTIVE_KEY: Record<
+  Tab,
+  | "mcq_adaptive"
+  | "flashcard_adaptive"
+  | "hq_adaptive"
+  | "trial_adaptive"
+  | "qcu_adaptive"
+> = {
+  mcq: "mcq_adaptive",
+  flashcards: "flashcard_adaptive",
+  hq: "hq_adaptive",
+  trial: "trial_adaptive",
+  qcu: "qcu_adaptive",
+};
+
+/** Maps any tab to its "generate on first pass?" flag in GenerateParams. */
+export const TAB_ENABLED_KEY: Record<
+  Tab,
+  | "mcq_enabled"
+  | "flashcard_enabled"
+  | "hq_enabled"
+  | "trial_enabled"
+  | "qcu_enabled"
+> = {
+  mcq: "mcq_enabled",
+  flashcards: "flashcard_enabled",
+  hq: "hq_enabled",
+  trial: "trial_enabled",
+  qcu: "qcu_enabled",
 };

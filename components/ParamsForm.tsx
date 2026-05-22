@@ -64,14 +64,18 @@ function CountField({
   label,
   value,
   adaptive,
+  enabled,
   onValueChange,
   onAdaptiveChange,
+  onEnabledChange,
 }: {
   label: string;
   value: number;
   adaptive: boolean;
+  enabled: boolean;
   onValueChange: (n: number) => void;
   onAdaptiveChange: (b: boolean) => void;
+  onEnabledChange: (b: boolean) => void;
 }) {
   return (
     <div>
@@ -79,21 +83,31 @@ function CountField({
         style={{
           fontSize: 11,
           fontWeight: 500,
-          color: "var(--text-muted)",
-          display: "block",
+          color: enabled ? "var(--text)" : "var(--text-muted)",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
           marginBottom: 5,
           letterSpacing: "0.02em",
+          cursor: "pointer",
         }}
       >
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onEnabledChange(e.target.checked)}
+          title="Generate this on the first pass"
+          style={{ accentColor: "var(--accent)", cursor: "pointer", margin: 0 }}
+        />
         {label}
       </label>
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 6, opacity: enabled ? 1 : 0.4 }}>
         <input
           type="number"
           min={1}
           max={50}
           value={adaptive ? "" : value}
-          disabled={adaptive}
+          disabled={adaptive || !enabled}
           placeholder={adaptive ? "Auto" : undefined}
           onChange={(e) => onValueChange(Number(e.target.value))}
           style={{
@@ -104,6 +118,7 @@ function CountField({
         />
         <button
           type="button"
+          disabled={!enabled}
           onClick={() => onAdaptiveChange(!adaptive)}
           data-tooltip="Let the generator pick a count based on document length"
           style={{
@@ -116,7 +131,7 @@ function CountField({
               : "1.5px solid var(--border)",
             background: adaptive ? "var(--accent-light)" : "#F7F6F3",
             color: adaptive ? "var(--accent)" : "var(--text-muted)",
-            cursor: "pointer",
+            cursor: enabled ? "pointer" : "not-allowed",
             fontFamily: "var(--font)",
             letterSpacing: "0.04em",
             textTransform: "uppercase",
@@ -204,18 +219,22 @@ export function ParamsForm({ params, onChange }: Props) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <CountField
-          label="MCQ count"
+          label="MCQ"
           value={params.mcq_count}
           adaptive={params.mcq_adaptive}
+          enabled={params.mcq_enabled}
           onValueChange={(n) => set("mcq_count", n)}
           onAdaptiveChange={(b) => set("mcq_adaptive", b)}
+          onEnabledChange={(b) => set("mcq_enabled", b)}
         />
         <CountField
           label="Flashcards"
           value={params.flashcard_count}
           adaptive={params.flashcard_adaptive}
+          enabled={params.flashcard_enabled}
           onValueChange={(n) => set("flashcard_count", n)}
           onAdaptiveChange={(b) => set("flashcard_adaptive", b)}
+          onEnabledChange={(b) => set("flashcard_enabled", b)}
         />
       </div>
 
@@ -238,22 +257,28 @@ export function ParamsForm({ params, onChange }: Props) {
           label="MCQ – HQ"
           value={params.hq_count}
           adaptive={params.hq_adaptive}
+          enabled={params.hq_enabled}
           onValueChange={(n) => set("hq_count", n)}
           onAdaptiveChange={(b) => set("hq_adaptive", b)}
+          onEnabledChange={(b) => set("hq_enabled", b)}
         />
         <CountField
           label="Trial"
           value={params.trial_count}
           adaptive={params.trial_adaptive}
+          enabled={params.trial_enabled}
           onValueChange={(n) => set("trial_count", n)}
           onAdaptiveChange={(b) => set("trial_adaptive", b)}
+          onEnabledChange={(b) => set("trial_enabled", b)}
         />
         <CountField
           label="QCU"
           value={params.qcu_count}
           adaptive={params.qcu_adaptive}
+          enabled={params.qcu_enabled}
           onValueChange={(n) => set("qcu_count", n)}
           onAdaptiveChange={(b) => set("qcu_adaptive", b)}
+          onEnabledChange={(b) => set("qcu_enabled", b)}
         />
       </div>
     </div>
