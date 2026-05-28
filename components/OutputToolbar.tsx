@@ -8,6 +8,7 @@ import { downloadTabMarkdown, tabMarkdown } from "@/lib/qa-api";
 interface Props {
   activeTab: Tab;
   onTabChange: (t: Tab) => void;
+  loadingTabs: Record<Tab, boolean>;
   /** MCQ list backing the active tab (variant tabs have their own list). */
   activeMcqs: MCQ[];
   flashcards: Flashcard[];
@@ -22,6 +23,7 @@ interface Props {
 export function OutputToolbar({
   activeTab,
   onTabChange,
+  loadingTabs,
   activeMcqs,
   flashcards,
   revealedCount,
@@ -101,9 +103,13 @@ export function OutputToolbar({
               cursor: "pointer",
               fontFamily: "var(--font)",
               transition: "all .15s",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             {label}
+            {loadingTabs[id] && <LoaderDots />}
           </button>
         ))}
       </div>
