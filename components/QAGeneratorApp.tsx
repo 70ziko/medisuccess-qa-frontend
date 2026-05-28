@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import officialLogo from "@/assets/Official Logo round.png";
 import type {
   ChatMessage,
   Flashcard,
@@ -373,9 +374,19 @@ export function QAGeneratorApp() {
             gap: 9,
           }}
         >
-          <span style={{ color: "var(--accent)" }}>
-            <Icon name="logo" size={20} />
-          </span>
+          <img
+            src={officialLogo.src}
+            alt="MediSuccess logo"
+            width={32}
+            height={32}
+            style={{
+              width: 32,
+              height: 32,
+              display: "block",
+              borderRadius: 999,
+              objectFit: "cover",
+            }}
+          />
           <div>
             <div
               style={{
