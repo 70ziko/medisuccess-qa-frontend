@@ -69,7 +69,7 @@ const emptyBools = (): Record<Tab, boolean> =>
   Object.fromEntries(ALL_TABS.map((t) => [t, false])) as Record<Tab, boolean>;
 
 export function QAGeneratorApp() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [params, setParams] = useState<GenerateParams>(DEFAULT_PARAMS);
   const [phase, setPhase] = useState<GenerationPhase>("idle");
   const [progressStep, setProgressStep] = useState(0);
@@ -132,7 +132,7 @@ export function QAGeneratorApp() {
     [jobId, params]
   );
 
-  const isReady = file !== null || params.topic.trim().length > 0;
+  const isReady = files.length > 0 || params.topic.trim().length > 0;
 
   const handleGenerate = useCallback(() => {
     if (!isReady) return;
@@ -164,7 +164,7 @@ export function QAGeneratorApp() {
     if (firstSelected) setActiveTab(firstSelected);
 
     const stop = startGenerationStream(
-      file,
+      files,
       params,
       (event) => {
         if (event.type === "progress") {
@@ -211,7 +211,7 @@ export function QAGeneratorApp() {
     );
 
     return stop;
-  }, [file, params, isReady]);
+  }, [files, params, isReady]);
 
   const handleChatSend = async (message: string, images: string[] = []) => {
     // Snapshot the tab so the reply lands on the thread it was sent from,
@@ -265,7 +265,7 @@ export function QAGeneratorApp() {
 
   const handleClear = () => {
     setPhase("idle");
-    setFile(null);
+    setFiles([]);
     setMcqs([]);
     setFlashcards([]);
     setChatHistories(emptyHistories());
@@ -419,7 +419,7 @@ export function QAGeneratorApp() {
             gap: 20,
           }}
         >
-          <PDFDropzone file={file} onChange={setFile} />
+          <PDFDropzone files={files} onChange={setFiles} />
           <ParamsForm params={params} onChange={setParams} />
 
           <button

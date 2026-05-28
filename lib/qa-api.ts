@@ -84,14 +84,14 @@ async function fetchWithBasicAuth(
 }
 
 export function startGenerationStream(
-  file: File | null,
+  files: File[],
   params: GenerateParams,
   onEvent: (e: SSEEvent) => void,
   onError: (err: Error) => void
 ): () => void {
   const controller = new AbortController();
   const form = new FormData();
-  if (file) form.append("file", file);
+  for (const file of files) form.append("files", file);
   form.append("params", JSON.stringify(params));
 
   fetchWithBasicAuth(`${BASE}/qa/generate`, {
