@@ -36,6 +36,9 @@ export interface GenerateParams {
   hq_adaptive: boolean;
   trial_adaptive: boolean;
   qcu_adaptive: boolean;
+  // Run flashcards in parallel with question generation and skip injecting
+  // flashcards into MCQ/variant prompts.
+  parallelize_flashcards: boolean;
   // Per-section "generate on the first pass?" toggles. Sections left off are
   // generated later on demand via the per-tab Generate button.
   mcq_enabled: boolean;

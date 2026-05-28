@@ -33,13 +33,14 @@ const DEFAULT_PARAMS: GenerateParams = {
   mcq_count: 10,
   flashcard_count: 10,
   mcq_adaptive: false,
-  flashcard_adaptive: false,
+  flashcard_adaptive: true,
   hq_count: 10,
   trial_count: 6,
   qcu_count: 10,
   hq_adaptive: false,
   trial_adaptive: false,
   qcu_adaptive: false,
+  parallelize_flashcards: false,
   // First-class sections default on; variants are opt-in per generation.
   mcq_enabled: true,
   flashcard_enabled: true,
@@ -545,6 +546,7 @@ export function QAGeneratorApp() {
             <OutputToolbar
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              loadingTabs={loadingTabs}
               activeMcqs={activeMcqs}
               flashcards={flashcards}
               revealedCount={revealedIds.size}

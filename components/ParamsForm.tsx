@@ -240,6 +240,25 @@ export function ParamsForm({ params, onChange }: Props) {
 
       <label
         style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 12,
+          color: "var(--text)",
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={params.parallelize_flashcards}
+          onChange={(e) => set("parallelize_flashcards", e.target.checked)}
+          style={{ accentColor: "var(--accent)", cursor: "pointer", margin: 0 }}
+        />
+        Parallelize flashcards with question generation
+      </label>
+
+      <label
+        style={{
           fontSize: 11,
           fontWeight: 600,
           color: "var(--text-muted)",
