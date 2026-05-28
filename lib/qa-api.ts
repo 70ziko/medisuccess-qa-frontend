@@ -143,6 +143,8 @@ export async function sendChatMessage(args: {
   variant?: MCQVariant;
   /** Data URLs of image(s) to attach to this message (mcq mode only). */
   images?: string[];
+  /** Reference questions for the trial second pass (HQ, else MCQ). */
+  referenceMcqs?: MCQ[];
 }): Promise<ChatResponse> {
   const res = await fetchWithBasicAuth(`${BASE}/qa/chat`, {
     method: "POST",
@@ -158,18 +160,22 @@ export async function sendChatMessage(args: {
       current_flashcards: args.currentFlashcards,
       variant: args.variant ?? null,
       images: args.images ?? [],
+      reference_mcqs: args.referenceMcqs ?? [],
     }),
   });
   if (!res.ok) throw new Error(`Chat error ${res.status}`);
   return (await res.json()) as ChatResponse;
 }
 
-/** Generate a single section on demand (any tab) for an existing job. */
+/** Generate a single section on demand (any tab) for an existing job.
+ *  `referenceMcqs` is the trial second pass's reference set (HQ, else MCQ);
+ *  ignored by the backend for non-trial sections. */
 export async function generateSection(
   jobId: string,
   section: Tab,
   targetCount?: number,
-  adaptive = false
+  adaptive = false,
+  referenceMcqs: MCQ[] = []
 ): Promise<GenerateSectionResponse> {
   const res = await fetchWithBasicAuth(`${BASE}/qa/generate-section`, {
     method: "POST",
@@ -179,6 +185,7 @@ export async function generateSection(
       section,
       target_count: adaptive ? null : targetCount ?? null,
       adaptive,
+      reference_mcqs: referenceMcqs,
     }),
   });
   if (!res.ok) throw new Error(`Section error ${res.status}`);

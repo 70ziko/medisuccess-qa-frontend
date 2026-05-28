@@ -102,6 +102,11 @@ export function QAGeneratorApp() {
   const isVariantTab = (t: Tab): t is MCQVariant =>
     t === "hq" || t === "trial" || t === "qcu";
 
+  // Reference set for the trial second pass: the already-generated HQ list, or
+  // MCQ when HQ has none, or empty (standalone) when neither exists.
+  const trialReference = (): MCQ[] =>
+    variantMcqs.hq.length > 0 ? variantMcqs.hq : mcqs;
+
   const markGenerated = (t: Tab) =>
     setGeneratedTabs((s) => {
       const next = new Set(s);
@@ -115,7 +120,14 @@ export function QAGeneratorApp() {
     (t: Tab) => {
       if (!jobId) return;
       setLoadingTabs((s) => ({ ...s, [t]: true }));
-      generateSection(jobId, t, params[TAB_COUNT_KEY[t]], params[TAB_ADAPTIVE_KEY[t]])
+      const reference = t === "trial" ? trialReference() : [];
+      generateSection(
+        jobId,
+        t,
+        params[TAB_COUNT_KEY[t]],
+        params[TAB_ADAPTIVE_KEY[t]],
+        reference
+      )
         .then((res) => {
           if (t === "flashcards") {
             if (res.flashcards) setFlashcards(res.flashcards);
@@ -129,7 +141,7 @@ export function QAGeneratorApp() {
         .catch((err: Error) => setErrorMsg(err.message))
         .finally(() => setLoadingTabs((s) => ({ ...s, [t]: false })));
     },
-    [jobId, params]
+    [jobId, params, variantMcqs, mcqs]
   );
 
   const isReady = files.length > 0 || params.topic.trim().length > 0;
@@ -245,6 +257,7 @@ export function QAGeneratorApp() {
         currentFlashcards: flashcards,
         variant,
         images: attachedImages,
+        referenceMcqs: variant === "trial" ? trialReference() : [],
       });
       if (reply.mcqs) {
         if (variant) {
