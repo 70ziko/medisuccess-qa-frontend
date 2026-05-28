@@ -63,6 +63,7 @@ export type SSEEvent =
     }
   | { type: "result"; data: GenerateResponse }
   | { type: "flashcards_partial"; data: Flashcard[] }
+  | { type: "mcq_result"; data: MCQ[] }
   | { type: "variant_result"; variant: MCQVariant; data: MCQ[] }
   | { type: "error"; message?: string };
 

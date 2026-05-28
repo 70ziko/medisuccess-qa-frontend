@@ -188,6 +188,11 @@ export function QAGeneratorApp() {
           setPhase((p) => (p === "loading" ? "streaming" : p));
           markGenerated("flashcards");
           setLoadingTabs((s) => ({ ...s, flashcards: false }));
+        } else if (event.type === "mcq_result") {
+          setMcqs(event.data);
+          markGenerated("mcq");
+          setLoadingTabs((s) => ({ ...s, mcq: false }));
+          setPhase((p) => (p === "loading" ? "streaming" : p));
         } else if (event.type === "variant_result") {
           const v = event.variant;
           setVariantMcqs((s) => ({ ...s, [v]: event.data }));
