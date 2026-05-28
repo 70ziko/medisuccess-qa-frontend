@@ -11,6 +11,8 @@ export interface MCQ {
   id: string;
   question: string;
   options: MCQOption[];
+  /** Data URLs of image(s) attached to this question via chat refinement. */
+  images?: string[];
 }
 
 export interface Flashcard {
@@ -71,6 +73,8 @@ export type GenerationPhase =
 export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
+  /** Data URLs of image(s) the user attached to this message (user role). */
+  images?: string[];
 }
 
 export interface ChatResponse {

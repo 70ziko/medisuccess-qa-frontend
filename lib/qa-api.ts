@@ -141,6 +141,8 @@ export async function sendChatMessage(args: {
   currentMcqs: MCQ[];
   currentFlashcards: Flashcard[];
   variant?: MCQVariant;
+  /** Data URLs of image(s) to attach to this message (mcq mode only). */
+  images?: string[];
 }): Promise<ChatResponse> {
   const res = await fetchWithBasicAuth(`${BASE}/qa/chat`, {
     method: "POST",
@@ -155,6 +157,7 @@ export async function sendChatMessage(args: {
       current_mcqs: args.currentMcqs,
       current_flashcards: args.currentFlashcards,
       variant: args.variant ?? null,
+      images: args.images ?? [],
     }),
   });
   if (!res.ok) throw new Error(`Chat error ${res.status}`);
@@ -191,8 +194,16 @@ export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {
       const corrections = q.options
         .map((o) => `${o.label}. ${o.justification}`)
         .join("\n");
+      // A question built from chat image(s) carries each as a tagged markdown
+      // image (data URL) so the exported file stays self-contained.
+      const imageMd = q.images?.length
+        ? "\n\n" +
+          q.images
+            .map((src, i) => `![Question image ${i + 1}](${src})`)
+            .join("\n\n")
+        : "";
       return (
-        `# Question\n${q.question}\n\n` +
+        `# Question\n${q.question}${imageMd}\n\n` +
         `# Réponses\n${options}\n\n` +
         `# Corrections\n${corrections}`
       );

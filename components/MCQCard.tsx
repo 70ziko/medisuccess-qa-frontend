@@ -76,6 +76,33 @@ export function MCQCard({ item, index, revealed, onReveal }: Props) {
         </p>
       </div>
 
+      {item.images && item.images.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: 14,
+          }}
+        >
+          {item.images.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={i}
+              src={src}
+              alt={`Question illustration ${i + 1}`}
+              style={{
+                display: "block",
+                maxWidth: "100%",
+                maxHeight: 320,
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {item.options.map((opt) => {
           const isSelected = selected.has(opt.label);

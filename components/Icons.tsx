@@ -60,6 +60,13 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
     </>
   ),
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </>
+  ),
   logo: (
     <g fill="currentColor">
       <rect x="3" y="3" width="8" height="8" rx="1.5" />
@@ -75,7 +82,7 @@ export function Icon({
   size = 16,
   style,
 }: IconProps & { name: string }) {
-  const strokeIcons = ["upload", "file", "send", "copy", "check", "x", "sparkle", "refresh", "download", "flip"];
+  const strokeIcons = ["upload", "file", "send", "copy", "check", "x", "sparkle", "refresh", "download", "flip", "image"];
   const isStroke = strokeIcons.includes(name);
   return (
     <span

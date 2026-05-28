@@ -211,26 +211,38 @@ export function QAGeneratorApp() {
     return stop;
   }, [file, params, isReady]);
 
-  const handleChatSend = async (message: string) => {
+  const handleChatSend = async (message: string, images: string[] = []) => {
     // Snapshot the tab so the reply lands on the thread it was sent from,
     // even if the user switches tabs mid-request.
     const tab = activeTab;
     const variant = isVariantTab(tab) ? tab : undefined;
+    const isFlashcards = tab === "flashcards";
+    // Images only apply to MCQ-style tabs.
+    const attachedImages = isFlashcards ? [] : images;
+    // Images with no typed instruction still need a directive for the LLM.
+    const outboundMessage =
+      message ||
+      (attachedImages.length > 0
+        ? params.language === "fr"
+          ? "Crée une question pour chaque image."
+          : "Create a question for each image."
+        : message);
     const tabMcqs = variant ? variantMcqs[variant] : mcqs;
     const appendToTab = (msg: ChatMessage) =>
       setChatHistories((h) => ({ ...h, [tab]: [...h[tab], msg] }));
 
-    appendToTab({ role: "user", text: message });
+    appendToTab({ role: "user", text: message, images: attachedImages });
     setChatLoadingTab((s) => ({ ...s, [tab]: true }));
     try {
       const reply = await sendChatMessage({
         jobId,
-        mode: tab === "flashcards" ? "flashcards" : "mcq",
-        message,
+        mode: isFlashcards ? "flashcards" : "mcq",
+        message: outboundMessage,
         history: chatHistories[tab],
         currentMcqs: tabMcqs,
         currentFlashcards: flashcards,
         variant,
+        images: attachedImages,
       });
       if (reply.mcqs) {
         if (variant) {
@@ -630,6 +642,7 @@ export function QAGeneratorApp() {
                   history={chatHistories[activeTab]}
                   loading={chatLoadingTab[activeTab]}
                   onSend={handleChatSend}
+                  imageEnabled={activeTab !== "flashcards"}
                 />
               )}
             </div>
