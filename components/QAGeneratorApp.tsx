@@ -44,7 +44,7 @@ const DEFAULT_PARAMS: GenerateParams = {
   trial_adaptive: false,
   qcu_adaptive: false,
   exercise_adaptive: false,
-  parallelize_flashcards: false,
+  parallelize_flashcards: true,
   // First-class sections default on; variants are opt-in per generation.
   mcq_enabled: true,
   flashcard_enabled: true,
