@@ -54,15 +54,29 @@ export interface GenerateResponse {
   flashcards: Flashcard[];
 }
 
+export interface ModelTokens {
+  input: number;
+  output: number;
+  total: number;
+  cost: number; // USD
+}
+
 export interface StageTokens {
   input: number;
   output: number;
   total: number;
+  by_model: Record<string, ModelTokens>;
 }
 
 export interface TokenUsage {
   stages: Record<string, StageTokens>;
-  total: StageTokens;
+  by_model: Record<string, ModelTokens>;
+  total: {
+    input: number;
+    output: number;
+    total: number;
+    cost: number; // USD
+  };
 }
 
 export type SSEEvent =

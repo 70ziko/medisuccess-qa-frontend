@@ -696,6 +696,9 @@ export function QAGeneratorApp() {
       {showTokens && tokenUsage && (
         <TokenUsagePanel
           usage={tokenUsage}
+          activeTab={activeTab}
+          loadingTabs={loadingTabs}
+          generatedTabs={generatedTabs}
           onClose={() => setShowTokens(false)}
         />
       )}

@@ -5,6 +5,12 @@ import type { MCQ, Flashcard, Tab, TokenUsage } from "@/types";
 import { Icon, IconBtn, LoaderDots, Pill } from "./Icons";
 import { downloadTabMarkdown, tabMarkdown } from "@/lib/qa-api";
 
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
 interface Props {
   activeTab: Tab;
   onTabChange: (t: Tab) => void;
@@ -20,12 +26,6 @@ interface Props {
   regenerating?: boolean;
   tokenUsage?: TokenUsage | null;
   onToggleTokens?: () => void;
-}
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
 }
 
 export function OutputToolbar({
@@ -84,11 +84,11 @@ export function OutputToolbar({
       >
         {(
           [
-            ["mcq", "MCQ"],
+            ["mcq",        "MCQ"],
             ["flashcards", "Flashcards"],
-            ["hq", "MCQ – HQ"],
-            ["trial", "Trial"],
-            ["qcu", "QCU"],
+            ["hq",         "MCQ – HQ"],
+            ["trial",      "Trial"],
+            ["qcu",        "QCU"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -140,12 +140,12 @@ export function OutputToolbar({
         )}
       </div>
 
-      {/* Actions — operate on the active tab */}
+      {/* Actions */}
       <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
         {tokenUsage && onToggleTokens && (
           <button
             onClick={onToggleTokens}
-            title="Token usage"
+            title={`Token usage · est. $${tokenUsage.total.cost.toFixed(4)}`}
             style={{
               display: "flex",
               alignItems: "center",
