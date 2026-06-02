@@ -54,6 +54,17 @@ export interface GenerateResponse {
   flashcards: Flashcard[];
 }
 
+export interface StageTokens {
+  input: number;
+  output: number;
+  total: number;
+}
+
+export interface TokenUsage {
+  stages: Record<string, StageTokens>;
+  total: StageTokens;
+}
+
 export type SSEEvent =
   | {
       type: "progress";
@@ -65,6 +76,7 @@ export type SSEEvent =
   | { type: "flashcards_partial"; data: Flashcard[] }
   | { type: "mcq_result"; data: MCQ[] }
   | { type: "variant_result"; variant: MCQVariant; data: MCQ[] }
+  | { type: "tokens_update"; data: TokenUsage }
   | { type: "error"; message?: string };
 
 export type GenerationPhase =

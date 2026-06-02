@@ -10,6 +10,7 @@ import type {
   MCQ,
   MCQVariant,
   Tab,
+  TokenUsage,
 } from "@/types";
 import { TAB_ADAPTIVE_KEY, TAB_COUNT_KEY, TAB_ENABLED_KEY } from "@/types";
 import {
@@ -24,6 +25,7 @@ import { MCQCard } from "./MCQCard";
 import { FlashcardItem } from "./FlashcardItem";
 import { OutputToolbar } from "./OutputToolbar";
 import { ChatBar } from "./ChatBar";
+import { TokenUsagePanel } from "./TokenUsagePanel";
 import { Icon, LoaderDots } from "./Icons";
 
 const DEFAULT_PARAMS: GenerateParams = {
@@ -87,6 +89,8 @@ export function QAGeneratorApp() {
     emptyBools
   );
   const [errorMsg, setErrorMsg] = useState("");
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
+  const [showTokens, setShowTokens] = useState(false);
   const [variantMcqs, setVariantMcqs] = useState<Record<MCQVariant, MCQ[]>>({
     hq: [],
     trial: [],
@@ -160,6 +164,8 @@ export function QAGeneratorApp() {
     setChatLoadingTab(emptyBools());
     setProgressStep(0);
     setProgressMsg("Initialisation…");
+    setTokenUsage(null);
+    setShowTokens(false);
 
     setMcqs([]);
     setFlashcards([]);
@@ -199,6 +205,8 @@ export function QAGeneratorApp() {
           markGenerated(v);
           setLoadingTabs((s) => ({ ...s, [v]: false }));
           setPhase((p) => (p === "loading" ? "streaming" : p));
+        } else if (event.type === "tokens_update") {
+          setTokenUsage(event.data);
         } else if (event.type === "result") {
           setMcqs(event.data.mcqs);
           setFlashcards(event.data.flashcards);
@@ -293,6 +301,8 @@ export function QAGeneratorApp() {
     setGeneratedTabs(new Set());
     setLoadingTabs(emptyBools());
     setActiveTab("mcq");
+    setTokenUsage(null);
+    setShowTokens(false);
   };
 
   // MCQ list backing the active tab (variant tabs have their own list).
@@ -576,6 +586,8 @@ export function QAGeneratorApp() {
                   : undefined
               }
               regenerating={loadingTabs[activeTab]}
+              tokenUsage={tokenUsage}
+              onToggleTokens={() => setShowTokens((s) => !s)}
             />
 
             <div
@@ -680,6 +692,13 @@ export function QAGeneratorApp() {
           </>
         )}
       </div>
+
+      {showTokens && tokenUsage && (
+        <TokenUsagePanel
+          usage={tokenUsage}
+          onClose={() => setShowTokens(false)}
+        />
+      )}
     </div>
   );
 }

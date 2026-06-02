@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MCQ, Flashcard, Tab } from "@/types";
+import type { MCQ, Flashcard, Tab, TokenUsage } from "@/types";
 import { Icon, IconBtn, LoaderDots, Pill } from "./Icons";
 import { downloadTabMarkdown, tabMarkdown } from "@/lib/qa-api";
 
@@ -18,6 +18,14 @@ interface Props {
   /** Re-run generation for the active tab (variant tabs only). */
   onRegenerate?: () => void;
   regenerating?: boolean;
+  tokenUsage?: TokenUsage | null;
+  onToggleTokens?: () => void;
+}
+
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
 }
 
 export function OutputToolbar({
@@ -31,6 +39,8 @@ export function OutputToolbar({
   onClear,
   onRegenerate,
   regenerating,
+  tokenUsage,
+  onToggleTokens,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const isFlashcards = activeTab === "flashcards";
@@ -131,7 +141,32 @@ export function OutputToolbar({
       </div>
 
       {/* Actions — operate on the active tab */}
-      <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+      <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+        {tokenUsage && onToggleTokens && (
+          <button
+            onClick={onToggleTokens}
+            title="Token usage"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "4px 9px",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              cursor: "pointer",
+              color: "var(--text-muted)",
+              fontSize: 11.5,
+              fontFamily: "var(--mono)",
+              fontWeight: 500,
+              whiteSpace: "nowrap",
+              transition: "all .15s",
+            }}
+          >
+            <Icon name="zap" size={12} />
+            {fmtTokens(tokenUsage.total.total)}
+          </button>
+        )}
         {onRegenerate && (
           <IconBtn
             onClick={() => {

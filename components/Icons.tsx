@@ -75,6 +75,7 @@ const paths: Record<string, React.ReactNode> = {
       <rect x="13" y="13" width="8" height="8" rx="1.5" />
     </g>
   ),
+  zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />,
 };
 
 export function Icon({
@@ -82,7 +83,7 @@ export function Icon({
   size = 16,
   style,
 }: IconProps & { name: string }) {
-  const strokeIcons = ["upload", "file", "send", "copy", "check", "x", "sparkle", "refresh", "download", "flip", "image"];
+  const strokeIcons = ["upload", "file", "send", "copy", "check", "x", "sparkle", "refresh", "download", "flip", "image", "zap"];
   const isStroke = strokeIcons.includes(name);
   return (
     <span
