@@ -11,17 +11,27 @@ interface Props {
 export function PDFDropzone({ files, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Merge in new PDFs, skipping duplicates (same name + size).
+  // Merge in new PDFs and images, skipping duplicates (same name + size).
+  // Images are passed to the exercise agent as question figures (decay schemes,
+  // graphs, tables, …); PDFs feed the full pipeline.
+  const isAccepted = (f: File) =>
+    f.type === "application/pdf" ||
+    f.type.startsWith("image/") ||
+    /\.(pdf|png|jpe?g|webp|gif)$/i.test(f.name);
+
   const addFiles = (incoming: File[]) => {
-    const pdfs = incoming.filter((f) => f.type === "application/pdf");
+    const accepted = incoming.filter(isAccepted);
     const merged = [...files];
-    for (const f of pdfs) {
+    for (const f of accepted) {
       if (!merged.some((e) => e.name === f.name && e.size === f.size)) {
         merged.push(f);
       }
     }
     onChange(merged);
   };
+
+  const isImage = (f: File) =>
+    f.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -67,7 +77,7 @@ export function PDFDropzone({ files, onChange }: Props) {
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,image/png,image/jpeg,image/webp,image/gif"
           multiple
           style={{ display: "none" }}
           onChange={(e) => {
@@ -87,7 +97,7 @@ export function PDFDropzone({ files, onChange }: Props) {
             lineHeight: 1.5,
           }}
         >
-          {files.length > 0 ? "Add more PDFs" : "Drop PDFs here"}
+          {files.length > 0 ? "Add more files" : "Drop PDFs or images here"}
           <br />
           <span style={{ fontSize: 11 }}>or click to browse</span>
         </div>
@@ -109,7 +119,7 @@ export function PDFDropzone({ files, onChange }: Props) {
               }}
             >
               <span style={{ color: "var(--accent)" }}>
-                <Icon name="file" size={15} />
+                <Icon name={isImage(file) ? "image" : "file"} size={15} />
               </span>
               <span
                 style={{

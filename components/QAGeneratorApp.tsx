@@ -39,9 +39,11 @@ const DEFAULT_PARAMS: GenerateParams = {
   hq_count: 10,
   trial_count: 6,
   qcu_count: 10,
+  exercise_count: 8,
   hq_adaptive: false,
   trial_adaptive: false,
   qcu_adaptive: false,
+  exercise_adaptive: false,
   parallelize_flashcards: false,
   // First-class sections default on; variants are opt-in per generation.
   mcq_enabled: true,
@@ -49,9 +51,10 @@ const DEFAULT_PARAMS: GenerateParams = {
   hq_enabled: false,
   trial_enabled: false,
   qcu_enabled: false,
+  exercise_enabled: false,
 };
 
-const ALL_TABS: Tab[] = ["mcq", "flashcards", "hq", "trial", "qcu"];
+const ALL_TABS: Tab[] = ["mcq", "flashcards", "hq", "trial", "qcu", "exercise"];
 
 const TAB_LABEL: Record<Tab, string> = {
   mcq: "MCQ",
@@ -59,6 +62,7 @@ const TAB_LABEL: Record<Tab, string> = {
   hq: "MCQ – HQ",
   trial: "Trial",
   qcu: "QCU",
+  exercise: "Exercises",
 };
 
 const emptyHistories = (): Record<Tab, ChatMessage[]> =>
@@ -95,6 +99,7 @@ export function QAGeneratorApp() {
     hq: [],
     trial: [],
     qcu: [],
+    exercise: [],
   });
   // Which tabs have produced their content (even if it came back empty), and
   // which are mid-generation (first pass or on-demand).
@@ -104,7 +109,7 @@ export function QAGeneratorApp() {
   );
 
   const isVariantTab = (t: Tab): t is MCQVariant =>
-    t === "hq" || t === "trial" || t === "qcu";
+    t === "hq" || t === "trial" || t === "qcu" || t === "exercise";
 
   // Reference set for the trial second pass: the already-generated HQ list, or
   // MCQ when HQ has none, or empty (standalone) when neither exists.
@@ -169,7 +174,7 @@ export function QAGeneratorApp() {
 
     setMcqs([]);
     setFlashcards([]);
-    setVariantMcqs({ hq: [], trial: [], qcu: [] });
+    setVariantMcqs({ hq: [], trial: [], qcu: [], exercise: [] });
     setGeneratedTabs(new Set());
     setLoadingTabs(
       Object.fromEntries(
@@ -297,7 +302,7 @@ export function QAGeneratorApp() {
     setChatHistories(emptyHistories());
     setChatLoadingTab(emptyBools());
     setRevealedIds(new Set());
-    setVariantMcqs({ hq: [], trial: [], qcu: [] });
+    setVariantMcqs({ hq: [], trial: [], qcu: [], exercise: [] });
     setGeneratedTabs(new Set());
     setLoadingTabs(emptyBools());
     setActiveTab("mcq");

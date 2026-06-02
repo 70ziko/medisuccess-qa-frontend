@@ -11,9 +11,10 @@ const TAB_LABELS: Record<Tab, string> = {
   hq:         "MCQ – HQ",
   trial:      "Trial",
   qcu:        "QCU",
+  exercise:   "Exercises",
 };
 
-const ALL_TABS: Tab[] = ["mcq", "flashcards", "hq", "trial", "qcu"];
+const ALL_TABS: Tab[] = ["mcq", "flashcards", "hq", "trial", "qcu", "exercise"];
 
 /** Stage keys that belong to each tab */
 const TAB_STAGES: Record<Tab, string[]> = {
@@ -22,6 +23,8 @@ const TAB_STAGES: Record<Tab, string[]> = {
   hq:         ["hq_generation",    "hq_validation"],
   trial:      ["trial_generation", "trial_validation"],
   qcu:        ["qcu_generation",   "qcu_validation"],
+  // Exercises produce structured output directly — generation only.
+  exercise:   ["exercise_generation"],
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -34,6 +37,7 @@ const STAGE_LABELS: Record<string, string> = {
   trial_validation: "Validation",
   qcu_generation:   "Generation",
   qcu_validation:   "Validation",
+  exercise_generation: "Generation",
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

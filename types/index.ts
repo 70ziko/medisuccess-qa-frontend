@@ -33,9 +33,11 @@ export interface GenerateParams {
   hq_count: number;
   trial_count: number;
   qcu_count: number;
+  exercise_count: number;
   hq_adaptive: boolean;
   trial_adaptive: boolean;
   qcu_adaptive: boolean;
+  exercise_adaptive: boolean;
   // Run flashcards in parallel with question generation and skip injecting
   // flashcards into MCQ/variant prompts.
   parallelize_flashcards: boolean;
@@ -46,6 +48,7 @@ export interface GenerateParams {
   hq_enabled: boolean;
   trial_enabled: boolean;
   qcu_enabled: boolean;
+  exercise_enabled: boolean;
 }
 
 export interface GenerateResponse {
@@ -113,7 +116,7 @@ export interface ChatResponse {
   flashcards?: Flashcard[];
 }
 
-export type MCQVariant = "hq" | "trial" | "qcu";
+export type MCQVariant = "hq" | "trial" | "qcu" | "exercise";
 
 export type Tab = "mcq" | "flashcards" | MCQVariant;
 
@@ -128,21 +131,23 @@ export interface GenerateSectionResponse {
 /** Maps a variant tab to its count field in GenerateParams. */
 export const VARIANT_COUNT_KEY: Record<
   MCQVariant,
-  "hq_count" | "trial_count" | "qcu_count"
+  "hq_count" | "trial_count" | "qcu_count" | "exercise_count"
 > = {
   hq: "hq_count",
   trial: "trial_count",
   qcu: "qcu_count",
+  exercise: "exercise_count",
 };
 
 /** Maps a variant tab to its adaptive ("Auto") flag in GenerateParams. */
 export const VARIANT_ADAPTIVE_KEY: Record<
   MCQVariant,
-  "hq_adaptive" | "trial_adaptive" | "qcu_adaptive"
+  "hq_adaptive" | "trial_adaptive" | "qcu_adaptive" | "exercise_adaptive"
 > = {
   hq: "hq_adaptive",
   trial: "trial_adaptive",
   qcu: "qcu_adaptive",
+  exercise: "exercise_adaptive",
 };
 
 /** Maps any tab to its count field in GenerateParams. */
@@ -153,12 +158,14 @@ export const TAB_COUNT_KEY: Record<
   | "hq_count"
   | "trial_count"
   | "qcu_count"
+  | "exercise_count"
 > = {
   mcq: "mcq_count",
   flashcards: "flashcard_count",
   hq: "hq_count",
   trial: "trial_count",
   qcu: "qcu_count",
+  exercise: "exercise_count",
 };
 
 /** Maps any tab to its adaptive ("Auto") flag in GenerateParams. */
@@ -169,12 +176,14 @@ export const TAB_ADAPTIVE_KEY: Record<
   | "hq_adaptive"
   | "trial_adaptive"
   | "qcu_adaptive"
+  | "exercise_adaptive"
 > = {
   mcq: "mcq_adaptive",
   flashcards: "flashcard_adaptive",
   hq: "hq_adaptive",
   trial: "trial_adaptive",
   qcu: "qcu_adaptive",
+  exercise: "exercise_adaptive",
 };
 
 /** Maps any tab to its "generate on first pass?" flag in GenerateParams. */
@@ -185,10 +194,12 @@ export const TAB_ENABLED_KEY: Record<
   | "hq_enabled"
   | "trial_enabled"
   | "qcu_enabled"
+  | "exercise_enabled"
 > = {
   mcq: "mcq_enabled",
   flashcards: "flashcard_enabled",
   hq: "hq_enabled",
   trial: "trial_enabled",
   qcu: "qcu_enabled",
+  exercise: "exercise_enabled",
 };

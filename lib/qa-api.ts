@@ -247,6 +247,7 @@ const TAB_FILE_SLUG: Record<Tab, string> = {
   hq: "mcq-hq",
   trial: "trial",
   qcu: "qcu",
+  exercise: "exercises",
 };
 
 export function downloadTabMarkdown(

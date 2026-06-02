@@ -51,6 +51,7 @@ export function OutputToolbar({
     hq:         { bg: "#ede9fe", text: "#6d28d9" },
     trial:      { bg: "#dcfce7", text: "#15803d" },
     qcu:        { bg: "#fce7f3", text: "#be185d" },
+    exercise:   { bg: "#fef9c3", text: "#a16207" },
   };
 
   const handleCopy = () => {
@@ -89,6 +90,7 @@ export function OutputToolbar({
             ["hq",         "MCQ – HQ"],
             ["trial",      "Trial"],
             ["qcu",        "QCU"],
+            ["exercise",   "Exercises"],
           ] as const
         ).map(([id, label]) => (
           <button

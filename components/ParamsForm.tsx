@@ -299,6 +299,15 @@ export function ParamsForm({ params, onChange }: Props) {
           onAdaptiveChange={(b) => set("qcu_adaptive", b)}
           onEnabledChange={(b) => set("qcu_enabled", b)}
         />
+        <CountField
+          label="Exercises"
+          value={params.exercise_count}
+          adaptive={params.exercise_adaptive}
+          enabled={params.exercise_enabled}
+          onValueChange={(n) => set("exercise_count", n)}
+          onAdaptiveChange={(b) => set("exercise_adaptive", b)}
+          onEnabledChange={(b) => set("exercise_enabled", b)}
+        />
       </div>
     </div>
   );
