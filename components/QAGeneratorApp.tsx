@@ -318,7 +318,9 @@ export function QAGeneratorApp() {
         }
       }
       if (reply.flashcards) setFlashcards(reply.flashcards);
-      setRevealedIds(new Set());
+      // Only collapse revealed answers when the items actually changed — a
+      // plain explanation reply (no mcqs/flashcards) leaves the set intact.
+      if (reply.mcqs || reply.flashcards) setRevealedIds(new Set());
       appendToTab({ role: "assistant", text: reply.message });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
