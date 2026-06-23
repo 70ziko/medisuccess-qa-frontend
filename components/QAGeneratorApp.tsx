@@ -28,6 +28,28 @@ import { ChatBar } from "./ChatBar";
 import { TokenUsagePanel } from "./TokenUsagePanel";
 import { Icon, LoaderDots } from "./Icons";
 
+interface FlashcardGroup {
+  source: string | null;
+  items: { item: Flashcard; index: number }[];
+}
+
+/** Group flashcards into contiguous runs by originating file, preserving the
+ *  card's overall position so the `#NN` numbering stays continuous. The backend
+ *  emits cards grouped per source, so contiguous runs map 1:1 to files. */
+function groupFlashcardsBySource(flashcards: Flashcard[]): FlashcardGroup[] {
+  const groups: FlashcardGroup[] = [];
+  flashcards.forEach((item, index) => {
+    const source = item.source ?? null;
+    const last = groups[groups.length - 1];
+    if (last && last.source === source) {
+      last.items.push({ item, index });
+    } else {
+      groups.push({ source, items: [{ item, index }] });
+    }
+  });
+  return groups;
+}
+
 const DEFAULT_PARAMS: GenerateParams = {
   topic: "",
   language: "fr",
@@ -749,8 +771,37 @@ export function QAGeneratorApp() {
                             : "Cards appear as questions are generated…"
                           : "Click any card to reveal the answer"}
                       </p>
-                      {flashcards.map((item, i) => (
-                        <FlashcardItem key={item.id} item={item} index={i} />
+                      {groupFlashcardsBySource(flashcards).map((group) => (
+                        <div
+                          key={group.source ?? "__nosource__"}
+                          style={{ marginBottom: 8 }}
+                        >
+                          {group.source && (
+                            <h3
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 7,
+                                margin: "18px 0 10px",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: "var(--text)",
+                              }}
+                            >
+                              <Icon name="file" size={14} />
+                              <span style={{ wordBreak: "break-all" }}>
+                                {group.source}
+                              </span>
+                            </h3>
+                          )}
+                          {group.items.map(({ item, index }) => (
+                            <FlashcardItem
+                              key={item.id}
+                              item={item}
+                              index={index}
+                            />
+                          ))}
+                        </div>
                       ))}
                     </>
                   ))}

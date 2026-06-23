@@ -19,6 +19,9 @@ export interface Flashcard {
   id: string;
   front: string;
   back: string;
+  /** Originating filename when generated from an uploaded document.
+   *  Null/absent for topic-only generation or items added via chat. */
+  source?: string | null;
 }
 
 export interface GenerateParams {

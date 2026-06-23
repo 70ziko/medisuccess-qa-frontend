@@ -254,13 +254,17 @@ export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {
 export function flashcardMarkdown(
   flashcards: GenerateResponse["flashcards"]
 ): string {
-  return [
-    "# Flashcards\n",
-    ...flashcards.map(
-      (f, i) =>
-        `### #${String(i + 1).padStart(2, "0")} ${f.front}\n\n${f.back}`
-    ),
-  ].join("\n\n");
+  const parts: string[] = ["# Flashcards\n"];
+  let currentSource: string | null | undefined = undefined;
+  flashcards.forEach((f, i) => {
+    const source = f.source ?? null;
+    if (source !== currentSource) {
+      currentSource = source;
+      if (source) parts.push(`## ${source}`);
+    }
+    parts.push(`### #${String(i + 1).padStart(2, "0")} ${f.front}\n\n${f.back}`);
+  });
+  return parts.join("\n\n");
 }
 
 /** Markdown for a single tab, in that tab's correct format. */
