@@ -221,25 +221,31 @@ export async function generateSection(
 
 export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {
   return mcqs
-    .map((q) => {
+    .map((q, i) => {
       const options = q.options
-        .map((o) => `${o.label}. ${o.text}`)
+        .map((o) => `- ${o.label}. ${o.text}`)
         .join("\n");
-      const corrections = q.options
-        .map((o) => `${o.label}. ${o.justification}`)
+      const answer =
+        q.options
+          .filter((o) => o.is_correct)
+          .map((o) => o.label)
+          .join(", ") || "—";
+      const justifications = q.options
+        .map((o) => `- ${o.label}. ${o.justification}`)
         .join("\n");
       // A question built from chat image(s) carries each as a tagged markdown
       // image (data URL) so the exported file stays self-contained.
       const imageMd = q.images?.length
         ? "\n\n" +
           q.images
-            .map((src, i) => `![Question image ${i + 1}](${src})`)
+            .map((src, idx) => `![Question image ${idx + 1}](${src})`)
             .join("\n\n")
         : "";
       return (
-        `# Question\n${q.question}${imageMd}\n\n` +
-        `# Réponses\n${options}\n\n` +
-        `# Corrections\n${corrections}`
+        `## Question ${i + 1}\n\n${q.question}${imageMd}\n\n` +
+        `${options}\n\n` +
+        `**Answer:** ${answer}\n\n` +
+        `**Justifications:**\n${justifications}`
       );
     })
     .join("\n\n");
@@ -284,7 +290,10 @@ export function downloadTabMarkdown(
   topic: string
 ) {
   const md = tabMarkdown(tab, mcqs, flashcards);
-  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  // Prepend a UTF-8 BOM so Word (and other Windows tools) auto-detect the
+  // encoding instead of falling back to a legacy codepage. Without it,
+  // accented characters open garbled until the user manually picks UTF-8.
+  const blob = new Blob(["\uFEFF", md], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
