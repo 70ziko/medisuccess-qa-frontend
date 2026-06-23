@@ -56,6 +56,33 @@ function authHeader(): string {
   return "Basic " + btoa(`${user}:${pass}`);
 }
 
+async function errorFromResponse(res: Response, prefix: string): Promise<Error> {
+  let detail = "";
+  try {
+    const text = await res.text();
+    if (text) {
+      try {
+        const body = JSON.parse(text);
+        if (typeof body?.detail === "string") {
+          detail = body.detail;
+        } else if (body?.detail != null) {
+          detail = JSON.stringify(body.detail);
+        } else if (typeof body?.message === "string") {
+          detail = body.message;
+        } else {
+          detail = text;
+        }
+      } catch {
+        detail = text;
+      }
+    }
+  } catch {
+    // network/stream read failure — fall through to the status line
+  }
+  detail = detail.trim();
+  return new Error(detail || `${prefix} (${res.status} ${res.statusText})`.trim());
+}
+
 async function fetchWithBasicAuth(
   input: RequestInfo | URL,
   init: RequestInit
@@ -101,7 +128,7 @@ export function startGenerationStream(
   })
     .then(async (res) => {
       if (!res.ok) {
-        onError(new Error(`Server error ${res.status}`));
+        onError(await errorFromResponse(res, "Server error"));
         return;
       }
       const reader = res.body!.getReader();
@@ -163,7 +190,7 @@ export async function sendChatMessage(args: {
       reference_mcqs: args.referenceMcqs ?? [],
     }),
   });
-  if (!res.ok) throw new Error(`Chat error ${res.status}`);
+  if (!res.ok) throw await errorFromResponse(res, "Chat error");
   return (await res.json()) as ChatResponse;
 }
 
@@ -188,7 +215,7 @@ export async function generateSection(
       reference_mcqs: referenceMcqs,
     }),
   });
-  if (!res.ok) throw new Error(`Section error ${res.status}`);
+  if (!res.ok) throw await errorFromResponse(res, "Section error");
   return (await res.json()) as GenerateSectionResponse;
 }
 

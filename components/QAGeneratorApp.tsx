@@ -74,6 +74,9 @@ const emptyHistories = (): Record<Tab, ChatMessage[]> =>
 const emptyBools = (): Record<Tab, boolean> =>
   Object.fromEntries(ALL_TABS.map((t) => [t, false])) as Record<Tab, boolean>;
 
+const emptyStrings = (): Record<Tab, string> =>
+  Object.fromEntries(ALL_TABS.map((t) => [t, ""])) as Record<Tab, string>;
+
 export function QAGeneratorApp() {
   const [files, setFiles] = useState<File[]>([]);
   const [params, setParams] = useState<GenerateParams>(DEFAULT_PARAMS);
@@ -107,6 +110,11 @@ export function QAGeneratorApp() {
   const [loadingTabs, setLoadingTabs] = useState<Record<Tab, boolean>>(
     emptyBools
   );
+  // Per-tab on-demand generation errors, surfaced inline in that tab's pane so
+  // a section failure is never silently swallowed.
+  const [sectionErrors, setSectionErrors] = useState<Record<Tab, string>>(
+    emptyStrings
+  );
 
   const isVariantTab = (t: Tab): t is MCQVariant =>
     t === "hq" || t === "trial" || t === "qcu" || t === "exercise";
@@ -129,6 +137,7 @@ export function QAGeneratorApp() {
     (t: Tab) => {
       if (!jobId) return;
       setLoadingTabs((s) => ({ ...s, [t]: true }));
+      setSectionErrors((s) => ({ ...s, [t]: "" }));
       const reference = t === "trial" ? trialReference() : [];
       generateSection(
         jobId,
@@ -147,7 +156,16 @@ export function QAGeneratorApp() {
           }
           markGenerated(t);
         })
-        .catch((err: Error) => setErrorMsg(err.message))
+        .catch((err: Error) =>
+          setSectionErrors((s) => ({
+            ...s,
+            [t]:
+              err.message ||
+              (params.language === "fr"
+                ? "La génération a échoué."
+                : "Generation failed."),
+          }))
+        )
         .finally(() => setLoadingTabs((s) => ({ ...s, [t]: false })));
     },
     [jobId, params, variantMcqs, mcqs]
@@ -287,8 +305,14 @@ export function QAGeneratorApp() {
       if (reply.flashcards) setFlashcards(reply.flashcards);
       setRevealedIds(new Set());
       appendToTab({ role: "assistant", text: reply.message });
-    } catch {
-      appendToTab({ role: "assistant", text: "Une erreur est survenue." });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      const prefix =
+        params.language === "fr" ? "Une erreur est survenue" : "An error occurred";
+      appendToTab({
+        role: "assistant",
+        text: detail ? `${prefix} : ${detail}` : `${prefix}.`,
+      });
     } finally {
       setChatLoadingTab((s) => ({ ...s, [tab]: false }));
     }
@@ -305,6 +329,7 @@ export function QAGeneratorApp() {
     setVariantMcqs({ hq: [], trial: [], qcu: [], exercise: [] });
     setGeneratedTabs(new Set());
     setLoadingTabs(emptyBools());
+    setSectionErrors(emptyStrings());
     setActiveTab("mcq");
     setTokenUsage(null);
     setShowTokens(false);
@@ -610,6 +635,23 @@ export function QAGeneratorApp() {
                   padding: "18px 22px",
                 }}
               >
+                {sectionErrors[activeTab] && (
+                  <div
+                    role="alert"
+                    style={{
+                      marginBottom: 14,
+                      padding: "10px 14px",
+                      borderRadius: 7,
+                      border: "1px solid var(--red)",
+                      background: "color-mix(in srgb, var(--red) 8%, transparent)",
+                      color: "var(--red)",
+                      fontSize: 12.5,
+                    }}
+                  >
+                    {sectionErrors[activeTab]}
+                  </div>
+                )}
+
                 {activeTab === "mcq" &&
                   (loadingTabs.mcq ? (
                     <LoadingPane />
