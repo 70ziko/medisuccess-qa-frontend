@@ -219,6 +219,39 @@ export async function generateSection(
   return (await res.json()) as GenerateSectionResponse;
 }
 
+/**
+ * Original QCM schema used by the "internal" MCQ variants (hq / trial / qcu /
+ * exercise). These feed an import system that parses this exact layout, so do
+ * NOT change the headings or structure here. The normal `mcq` tab uses the more
+ * generic `mcqMarkdown` below instead.
+ */
+export function mcqImportMarkdown(mcqs: GenerateResponse["mcqs"]): string {
+  return mcqs
+    .map((q) => {
+      const options = q.options
+        .map((o) => `${o.label}. ${o.text}`)
+        .join("\n");
+      const corrections = q.options
+        .map((o) => `${o.label}. ${o.justification}`)
+        .join("\n");
+      // A question built from chat image(s) carries each as a tagged markdown
+      // image (data URL) so the exported file stays self-contained.
+      const imageMd = q.images?.length
+        ? "\n\n" +
+          q.images
+            .map((src, i) => `![Question image ${i + 1}](${src})`)
+            .join("\n\n")
+        : "";
+      return (
+        `# Question\n${q.question}${imageMd}\n\n` +
+        `# Réponses\n${options}\n\n` +
+        `# Corrections\n${corrections}`
+      );
+    })
+    .join("\n\n");
+}
+
+/** Generic, language-neutral format for the normal `mcq` tab. */
 export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {
   return mcqs
     .map((q, i) => {
@@ -273,9 +306,11 @@ export function tabMarkdown(
   mcqs: GenerateResponse["mcqs"],
   flashcards: GenerateResponse["flashcards"]
 ): string {
-  return tab === "flashcards"
-    ? flashcardMarkdown(flashcards)
-    : mcqMarkdown(mcqs);
+  if (tab === "flashcards") return flashcardMarkdown(flashcards);
+  // Internal variants feed an import system and must keep the original QCM
+  // schema; only the normal `mcq` tab uses the generic format.
+  if (tab === "mcq") return mcqMarkdown(mcqs);
+  return mcqImportMarkdown(mcqs);
 }
 
 const TAB_FILE_SLUG: Record<Tab, string> = {
