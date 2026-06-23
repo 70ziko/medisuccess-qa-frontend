@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import officialLogo from "@/assets/Official Logo round.png";
 import type {
   ChatMessage,
@@ -115,6 +115,9 @@ export function QAGeneratorApp() {
   const [sectionErrors, setSectionErrors] = useState<Record<Tab, string>>(
     emptyStrings
   );
+  // Abort handle for the in-flight generation stream; lets the user stop the
+  // run while keeping whatever results have already streamed in.
+  const streamStopRef = useRef<(() => void) | null>(null);
 
   const isVariantTab = (t: Tab): t is MCQVariant =>
     t === "hq" || t === "trial" || t === "qcu" || t === "exercise";
@@ -204,7 +207,7 @@ export function QAGeneratorApp() {
     const firstSelected = ALL_TABS.find((t) => firstPass.has(t));
     if (firstSelected) setActiveTab(firstSelected);
 
-    const stop = startGenerationStream(
+    streamStopRef.current = startGenerationStream(
       files,
       params,
       (event) => {
@@ -246,20 +249,32 @@ export function QAGeneratorApp() {
             });
             return next;
           });
+          streamStopRef.current = null;
           setPhase("done");
         } else if (event.type === "error") {
+          streamStopRef.current = null;
           setErrorMsg(event.message ?? "Unknown error");
           setPhase("error");
         }
       },
       (err) => {
+        streamStopRef.current = null;
         setErrorMsg(err.message);
         setPhase("error");
       }
     );
-
-    return stop;
   }, [files, params, isReady]);
+
+  // Abort the in-flight stream but keep everything that has already arrived.
+  // Tabs that produced content move to "done"; a stop before any data falls
+  // back to idle (nothing worth showing).
+  const handleStop = useCallback(() => {
+    streamStopRef.current?.();
+    streamStopRef.current = null;
+    setLoadingTabs(emptyBools());
+    setProgressMsg("");
+    setPhase((p) => (p === "streaming" ? "done" : "idle"));
+  }, []);
 
   const handleChatSend = async (message: string, images: string[] = []) => {
     // Snapshot the tab so the reply lands on the thread it was sent from,
@@ -319,6 +334,8 @@ export function QAGeneratorApp() {
   };
 
   const handleClear = () => {
+    streamStopRef.current?.();
+    streamStopRef.current = null;
     setPhase("idle");
     setFiles([]);
     setMcqs([]);
@@ -337,9 +354,19 @@ export function QAGeneratorApp() {
 
   // MCQ list backing the active tab (variant tabs have their own list).
   const activeMcqs = isVariantTab(activeTab) ? variantMcqs[activeTab] : mcqs;
+  const activeRevealedCount = activeMcqs.filter((item) =>
+    revealedIds.has(item.id)
+  ).length;
 
   const onReveal = (id: string) =>
     setRevealedIds((s) => new Set(Array.from(s).concat(id)));
+
+  const onUnreveal = (id: string) =>
+    setRevealedIds((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
 
   // Centered prompt for a tab that wasn't part of the first pass.
   const GeneratePrompt = ({ tab }: { tab: Tab }) => (
@@ -480,37 +507,66 @@ export function QAGeneratorApp() {
           <PDFDropzone files={files} onChange={setFiles} />
           <ParamsForm params={params} onChange={setParams} />
 
-          <button
-            onClick={handleGenerate}
-            disabled={!isReady || phase === "loading" || phase === "streaming"}
-            style={{
-              marginTop: "auto",
-              padding: "11px 0",
-              borderRadius: "var(--radius)",
-              background: isReady ? "var(--accent)" : "var(--border)",
-              color: isReady ? "#fff" : "var(--text-muted)",
-              border: "none",
-              fontFamily: "var(--font)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: isReady ? "pointer" : "not-allowed",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 7,
-              transition: "all .2s ease",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {phase === "loading" || phase === "streaming" ? (
-              <LoaderDots />
-            ) : (
-              <>
-                <Icon name="sparkle" size={14} />
-                Generate
-              </>
-            )}
-          </button>
+          {phase === "loading" || phase === "streaming" ? (
+            <button
+              onClick={handleStop}
+              style={{
+                marginTop: "auto",
+                padding: "11px 0",
+                borderRadius: "var(--radius)",
+                background: "var(--red)",
+                color: "#fff",
+                border: "none",
+                fontFamily: "var(--font)",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                transition: "all .2s ease",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              <span
+                style={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: 2,
+                  background: "#fff",
+                  display: "inline-block",
+                }}
+              />
+              {params.language === "fr" ? "Arrêter" : "Stop"}
+            </button>
+          ) : (
+            <button
+              onClick={handleGenerate}
+              disabled={!isReady}
+              style={{
+                marginTop: "auto",
+                padding: "11px 0",
+                borderRadius: "var(--radius)",
+                background: isReady ? "var(--accent)" : "var(--border)",
+                color: isReady ? "#fff" : "var(--text-muted)",
+                border: "none",
+                fontFamily: "var(--font)",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: isReady ? "pointer" : "not-allowed",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 7,
+                transition: "all .2s ease",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              <Icon name="sparkle" size={14} />
+              Generate
+            </button>
+          )}
         </div>
       </div>
 
@@ -607,11 +663,11 @@ export function QAGeneratorApp() {
               loadingTabs={loadingTabs}
               activeMcqs={activeMcqs}
               flashcards={flashcards}
-              revealedCount={revealedIds.size}
+              revealedCount={activeRevealedCount}
               topic={params.topic}
               onClear={handleClear}
               onRegenerate={
-                generatedTabs.has(activeTab)
+                jobId && generatedTabs.has(activeTab)
                   ? () => runSection(activeTab)
                   : undefined
               }
@@ -665,6 +721,7 @@ export function QAGeneratorApp() {
                         index={i}
                         revealed={revealedIds.has(item.id)}
                         onReveal={onReveal}
+                        onUnreveal={onUnreveal}
                       />
                     ))
                   ))}
@@ -721,12 +778,13 @@ export function QAGeneratorApp() {
                         index={i}
                         revealed={revealedIds.has(item.id)}
                         onReveal={onReveal}
+                        onUnreveal={onUnreveal}
                       />
                     ))
                   ))}
               </div>
 
-              {phase === "done" && generatedTabs.has(activeTab) && (
+              {phase === "done" && jobId && generatedTabs.has(activeTab) && (
                 <ChatBar
                   key={activeTab}
                   history={chatHistories[activeTab]}

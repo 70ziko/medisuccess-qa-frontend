@@ -9,9 +9,16 @@ interface Props {
   index: number;
   revealed: boolean;
   onReveal: (id: string) => void;
+  onUnreveal: (id: string) => void;
 }
 
-export function MCQCard({ item, index, revealed, onReveal }: Props) {
+export function MCQCard({
+  item,
+  index,
+  revealed,
+  onReveal,
+  onUnreveal,
+}: Props) {
   const [selected, setSelected] = useState<Set<MCQLabel>>(new Set());
 
   const toggle = (label: MCQLabel) => {
@@ -27,6 +34,11 @@ export function MCQCard({ item, index, revealed, onReveal }: Props) {
   const handleCheck = () => {
     if (revealed) return;
     onReveal(item.id);
+  };
+
+  const handleHide = () => {
+    if (!revealed) return;
+    onUnreveal(item.id);
   };
 
   return (
@@ -205,27 +217,30 @@ export function MCQCard({ item, index, revealed, onReveal }: Props) {
         })}
       </div>
 
-      {!revealed && (
-        <button
-          onClick={handleCheck}
-          disabled={selected.size === 0}
-          style={{
-            marginTop: 14,
-            padding: "8px 16px",
-            borderRadius: 7,
-            background: selected.size === 0 ? "var(--border)" : "var(--accent)",
-            color: selected.size === 0 ? "var(--text-muted)" : "#fff",
-            border: "none",
-            fontFamily: "var(--font)",
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: selected.size === 0 ? "not-allowed" : "pointer",
-            transition: "all .15s ease",
-          }}
-        >
-          Vérifier les réponses
-        </button>
-      )}
+      <button
+        onClick={revealed ? handleHide : handleCheck}
+        disabled={!revealed && selected.size === 0}
+        style={{
+          marginTop: 14,
+          padding: "8px 16px",
+          borderRadius: 7,
+          background:
+            !revealed && selected.size === 0 ? "var(--border)" : "var(--accent)",
+          color: !revealed && selected.size === 0 ? "var(--text-muted)" : "#fff",
+          border: "none",
+          fontFamily: "var(--font)",
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: !revealed && selected.size === 0 ? "not-allowed" : "pointer",
+          transition: "all .15s ease",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 7,
+        }}
+      >
+        {revealed && <Icon name="flip" size={13} />}
+        {revealed ? "Masquer les réponses" : "Vérifier les réponses"}
+      </button>
     </div>
   );
 }
