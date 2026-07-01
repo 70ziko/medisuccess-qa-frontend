@@ -253,6 +253,11 @@ export function QAGeneratorApp() {
           markGenerated(v);
           setLoadingTabs((s) => ({ ...s, [v]: false }));
           setPhase((p) => (p === "loading" ? "streaming" : p));
+          // A variant only streams back when it was requested — except when the
+          // server auto-detects a corrected-exercise document and returns
+          // exercises we never asked for. In that case, focus that tab so the
+          // results aren't hidden behind the (empty) first-pass tabs.
+          if (!firstPass.has(v)) setActiveTab(v);
         } else if (event.type === "tokens_update") {
           setTokenUsage(event.data);
         } else if (event.type === "result") {
