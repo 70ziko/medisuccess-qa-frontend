@@ -13,47 +13,78 @@ import type {
 import { TABS } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const USER = process.env.NEXT_PUBLIC_QA_USER ?? "medisuccess";
-const PASS = process.env.NEXT_PUBLIC_QA_PASS ?? "";
+const DEFAULT_USER = "medisuccess";
 
-let promptedUser: string | null = null;
-let promptedPass: string | null = null;
+// Credentials are never read from the environment. `NEXT_PUBLIC_*` values are
+// inlined into the static export at build time, so anything set there would be
+// readable by every visitor of the deployed site. They are entered by the
+// operator instead and kept in sessionStorage, which is scoped to this tab and
+// cleared when it closes — so a reload does not re-prompt, but the credentials
+// never reach the bundle or survive the browser session.
+const STORAGE_KEY = "qa-basic-auth";
 
-function hasStaticCredentials(): boolean {
-  return USER.trim().length > 0 && PASS.trim().length > 0;
-}
+type Credentials = { user: string; pass: string };
 
-function clearPromptedCredentials() {
-  promptedUser = null;
-  promptedPass = null;
-}
+let cached: Credentials | null = null;
 
-function ensurePromptedCredentials(): { user: string; pass: string } {
-  if (promptedUser !== null && promptedPass !== null) {
-    return { user: promptedUser, pass: promptedPass };
+function readStoredCredentials(): Credentials | null {
+  if (cached) return cached;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<Credentials>;
+    if (!parsed?.user || !parsed?.pass) return null;
+    cached = { user: parsed.user, pass: parsed.pass };
+    return cached;
+  } catch {
+    // Private-mode/quota failures and malformed entries fall back to prompting.
+    return null;
   }
+}
+
+function storeCredentials(credentials: Credentials) {
+  cached = credentials;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(credentials));
+  } catch {
+    // Non-fatal: the in-memory cache still covers this page view.
+  }
+}
+
+function clearCredentials() {
+  cached = null;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Nothing to do — the in-memory cache is already cleared.
+  }
+}
+
+function ensureCredentials(): Credentials {
+  const stored = readStoredCredentials();
+  if (stored) return stored;
 
   if (typeof window === "undefined") {
     throw new Error("Missing API credentials for basic auth");
   }
 
-  const user = window.prompt("API username", USER)?.trim() ?? "";
+  const user = window.prompt("API username", DEFAULT_USER)?.trim() ?? "";
   const pass = window.prompt("API password") ?? "";
 
   if (!user || !pass) {
     throw new Error("Basic auth credentials are required");
   }
 
-  promptedUser = user;
-  promptedPass = pass;
-  return { user, pass };
+  const credentials = { user, pass };
+  storeCredentials(credentials);
+  return credentials;
 }
 
 function authHeader(): string {
-  if (hasStaticCredentials()) {
-    return "Basic " + btoa(`${USER}:${PASS}`);
-  }
-  const { user, pass } = ensurePromptedCredentials();
+  const { user, pass } = ensureCredentials();
   return "Basic " + btoa(`${user}:${pass}`);
 }
 
@@ -94,10 +125,13 @@ async function fetchWithBasicAuth(
   });
 
   const first = await fetch(input, withAuth());
-  if (first.status !== 401 || hasStaticCredentials()) {
+  if (first.status !== 401) {
     return first;
   }
-  clearPromptedCredentials();
+  // Stored credentials were rejected — drop them and prompt once more, so a
+  // stale sessionStorage entry (rotated password) self-heals instead of
+  // wedging every request for the rest of the session.
+  clearCredentials();
   return fetch(input, withAuth());
 }
 
