@@ -15,12 +15,6 @@ import { TABS } from "@/types";
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const DEFAULT_USER = "medisuccess";
 
-// Credentials are never read from the environment. `NEXT_PUBLIC_*` values are
-// inlined into the static export at build time, so anything set there would be
-// readable by every visitor of the deployed site. They are entered by the
-// operator instead and kept in sessionStorage, which is scoped to this tab and
-// cleared when it closes — so a reload does not re-prompt, but the credentials
-// never reach the bundle or survive the browser session.
 const STORAGE_KEY = "qa-basic-auth";
 
 type Credentials = { user: string; pass: string };
@@ -128,9 +122,6 @@ async function fetchWithBasicAuth(
   if (first.status !== 401) {
     return first;
   }
-  // Stored credentials were rejected — drop them and prompt once more, so a
-  // stale sessionStorage entry (rotated password) self-heals instead of
-  // wedging every request for the rest of the session.
   clearCredentials();
   return fetch(input, withAuth());
 }
