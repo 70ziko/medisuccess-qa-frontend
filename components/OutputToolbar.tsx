@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { MCQ, Flashcard, Tab, TokenUsage } from "@/types";
+import { TABS } from "@/types";
 import { Icon, IconBtn, LoaderDots, Pill } from "./Icons";
 import { downloadTabMarkdown, tabMarkdown } from "@/lib/qa-api";
 
@@ -45,15 +46,6 @@ export function OutputToolbar({
   const [copied, setCopied] = useState(false);
   const isFlashcards = activeTab === "flashcards";
 
-  const TAB_COLORS: Record<string, { bg: string; text: string }> = {
-    flashcards: { bg: "#dbeafe", text: "#1d4ed8" },
-    mcq:        { bg: "#ffedd5", text: "#c2410c" },
-    hq:         { bg: "#ede9fe", text: "#6d28d9" },
-    trial:      { bg: "#dcfce7", text: "#15803d" },
-    qcu:        { bg: "#fce7f3", text: "#be185d" },
-    exercise:   { bg: "#fef9c3", text: "#a16207" },
-  };
-
   const handleCopy = () => {
     const md = tabMarkdown(activeTab, activeMcqs, flashcards);
     navigator.clipboard.writeText(md).catch(() => {});
@@ -83,16 +75,7 @@ export function OutputToolbar({
           padding: 3,
         }}
       >
-        {(
-          [
-            ["mcq",        "MCQ"],
-            ["flashcards", "Flashcards"],
-            ["hq",         "MCQ – HQ"],
-            ["trial",      "Trial"],
-            ["qcu",        "QCU"],
-            ["exercise",   "Exercises"],
-          ] as const
-        ).map(([id, label]) => (
+        {TABS.map(({ id, label, color }) => (
           <button
             key={id}
             onClick={() => onTabChange(id)}
@@ -102,14 +85,8 @@ export function OutputToolbar({
               border: "none",
               fontSize: 13,
               fontWeight: 500,
-              background:
-                activeTab === id
-                  ? TAB_COLORS[id]?.bg ?? "var(--surface)"
-                  : "transparent",
-              color:
-                activeTab === id
-                  ? TAB_COLORS[id]?.text ?? "var(--text)"
-                  : "var(--text-muted)",
+              background: activeTab === id ? color.bg : "transparent",
+              color: activeTab === id ? color.text : "var(--text-muted)",
               boxShadow:
                 activeTab === id ? "0 1px 3px rgba(0,0,0,.10)" : "none",
               cursor: "pointer",

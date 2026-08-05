@@ -10,6 +10,7 @@ import type {
   SSEEvent,
   Tab,
 } from "@/types";
+import { TABS } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const USER = process.env.NEXT_PUBLIC_QA_USER ?? "medisuccess";
@@ -87,27 +88,17 @@ async function fetchWithBasicAuth(
   input: RequestInfo | URL,
   init: RequestInit
 ): Promise<Response> {
-  const first = await fetch(input, {
+  const withAuth = (): RequestInit => ({
     ...init,
-    headers: {
-      ...(init.headers ?? {}),
-      Authorization: authHeader(),
-    },
+    headers: { ...(init.headers ?? {}), Authorization: authHeader() },
   });
 
+  const first = await fetch(input, withAuth());
   if (first.status !== 401 || hasStaticCredentials()) {
     return first;
   }
-
   clearPromptedCredentials();
-  const retried = await fetch(input, {
-    ...init,
-    headers: {
-      ...(init.headers ?? {}),
-      Authorization: authHeader(),
-    },
-  });
-  return retried;
+  return fetch(input, withAuth());
 }
 
 export function startGenerationStream(
@@ -219,12 +210,17 @@ export async function generateSection(
   return (await res.json()) as GenerateSectionResponse;
 }
 
-/**
- * Original QCM schema used by the "internal" MCQ variants (hq / trial / qcu /
- * exercise). These feed an import system that parses this exact layout, so do
- * NOT change the headings or structure here. The normal `mcq` tab uses the more
- * generic `mcqMarkdown` below instead.
- */
+// Chat-attached images become tagged markdown images so the export is self-contained.
+function formatImageMarkdown(images?: string[]): string {
+  if (!images?.length) return "";
+  return (
+    "\n\n" +
+    images.map((src, i) => `![Question image ${i + 1}](${src})`).join("\n\n")
+  );
+}
+
+// Original QCM schema for the internal variants (hq / trial / qcu / exercise);
+// it feeds an import system, so keep the headings and structure exactly.
 export function mcqImportMarkdown(mcqs: GenerateResponse["mcqs"]): string {
   return mcqs
     .map((q) => {
@@ -234,14 +230,7 @@ export function mcqImportMarkdown(mcqs: GenerateResponse["mcqs"]): string {
       const corrections = q.options
         .map((o) => `${o.label}. ${o.justification}`)
         .join("\n");
-      // A question built from chat image(s) carries each as a tagged markdown
-      // image (data URL) so the exported file stays self-contained.
-      const imageMd = q.images?.length
-        ? "\n\n" +
-          q.images
-            .map((src, i) => `![Question image ${i + 1}](${src})`)
-            .join("\n\n")
-        : "";
+      const imageMd = formatImageMarkdown(q.images);
       return (
         `# Question\n${q.question}${imageMd}\n\n` +
         `# Réponses\n${options}\n\n` +
@@ -251,7 +240,7 @@ export function mcqImportMarkdown(mcqs: GenerateResponse["mcqs"]): string {
     .join("\n\n");
 }
 
-/** Generic, language-neutral format for the normal `mcq` tab. */
+// Generic, language-neutral format for the normal `mcq` tab.
 export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {
   return mcqs
     .map((q, i) => {
@@ -266,14 +255,7 @@ export function mcqMarkdown(mcqs: GenerateResponse["mcqs"]): string {
       const justifications = q.options
         .map((o) => `- ${o.label}. ${o.justification}`)
         .join("\n");
-      // A question built from chat image(s) carries each as a tagged markdown
-      // image (data URL) so the exported file stays self-contained.
-      const imageMd = q.images?.length
-        ? "\n\n" +
-          q.images
-            .map((src, idx) => `![Question image ${idx + 1}](${src})`)
-            .join("\n\n")
-        : "";
+      const imageMd = formatImageMarkdown(q.images);
       return (
         `## Question ${i + 1}\n\n${q.question}${imageMd}\n\n` +
         `${options}\n\n` +
@@ -313,15 +295,6 @@ export function tabMarkdown(
   return mcqImportMarkdown(mcqs);
 }
 
-const TAB_FILE_SLUG: Record<Tab, string> = {
-  mcq: "mcq",
-  flashcards: "flashcards",
-  hq: "mcq-hq",
-  trial: "trial",
-  qcu: "qcu",
-  exercise: "exercises",
-};
-
 export function downloadTabMarkdown(
   tab: Tab,
   mcqs: GenerateResponse["mcqs"],
@@ -337,7 +310,8 @@ export function downloadTabMarkdown(
   const a = document.createElement("a");
   a.href = url;
   const slug = topic.replace(/\s+/g, "-").toLowerCase() || "generated";
-  a.download = `qa-${slug}-${TAB_FILE_SLUG[tab]}.md`;
+  const tabSlug = TABS.find((t) => t.id === tab)?.slug ?? tab;
+  a.download = `qa-${slug}-${tabSlug}.md`;
   a.click();
   URL.revokeObjectURL(url);
 }

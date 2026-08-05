@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MCQ, MCQLabel } from "@/types";
+import type { GenerateParams, MCQ, MCQLabel } from "@/types";
 import { Icon } from "./Icons";
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
   revealed: boolean;
   onReveal: (id: string) => void;
   onUnreveal: (id: string) => void;
+  language: GenerateParams["language"];
 }
 
 export function MCQCard({
@@ -18,6 +19,7 @@ export function MCQCard({
   revealed,
   onReveal,
   onUnreveal,
+  language,
 }: Props) {
   const [selected, setSelected] = useState<Set<MCQLabel>>(new Set());
 
@@ -239,7 +241,13 @@ export function MCQCard({
         }}
       >
         {revealed && <Icon name="flip" size={13} />}
-        {revealed ? "Masquer les réponses" : "Vérifier les réponses"}
+        {revealed
+          ? language === "fr"
+            ? "Masquer les réponses"
+            : "Hide answers"
+          : language === "fr"
+            ? "Vérifier les réponses"
+            : "Check answers"}
       </button>
     </div>
   );

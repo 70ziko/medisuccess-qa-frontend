@@ -12,7 +12,7 @@ import type {
   Tab,
   TokenUsage,
 } from "@/types";
-import { TAB_ADAPTIVE_KEY, TAB_COUNT_KEY, TAB_ENABLED_KEY } from "@/types";
+import { TAB_ADAPTIVE_KEY, TAB_COUNT_KEY, TAB_ENABLED_KEY, TABS } from "@/types";
 import {
   generateSection,
   sendChatMessage,
@@ -33,9 +33,8 @@ interface FlashcardGroup {
   items: { item: Flashcard; index: number }[];
 }
 
-/** Group flashcards into contiguous runs by originating file, preserving the
- *  card's overall position so the `#NN` numbering stays continuous. The backend
- *  emits cards grouped per source, so contiguous runs map 1:1 to files. */
+// Contiguous runs of flashcards by source file, keeping each card's overall
+// index so the `#NN` numbering stays continuous.
 function groupFlashcardsBySource(flashcards: Flashcard[]): FlashcardGroup[] {
   const groups: FlashcardGroup[] = [];
   flashcards.forEach((item, index) => {
@@ -76,28 +75,18 @@ const DEFAULT_PARAMS: GenerateParams = {
   exercise_enabled: false,
 };
 
-const ALL_TABS: Tab[] = ["mcq", "flashcards", "hq", "trial", "qcu", "exercise"];
+const ALL_TABS: Tab[] = TABS.map((t) => t.id);
 
-const TAB_LABEL: Record<Tab, string> = {
-  mcq: "MCQ",
-  flashcards: "Flashcards",
-  hq: "MCQ – HQ",
-  trial: "Trial",
-  qcu: "QCU",
-  exercise: "Exercises",
-};
+const TAB_LABEL = Object.fromEntries(
+  TABS.map((t) => [t.id, t.label])
+) as Record<Tab, string>;
 
-const emptyHistories = (): Record<Tab, ChatMessage[]> =>
-  Object.fromEntries(ALL_TABS.map((t) => [t, [] as ChatMessage[]])) as Record<
-    Tab,
-    ChatMessage[]
-  >;
+const emptyTabRecord = <T,>(make: () => T): Record<Tab, T> =>
+  Object.fromEntries(ALL_TABS.map((t) => [t, make()])) as Record<Tab, T>;
 
-const emptyBools = (): Record<Tab, boolean> =>
-  Object.fromEntries(ALL_TABS.map((t) => [t, false])) as Record<Tab, boolean>;
-
-const emptyStrings = (): Record<Tab, string> =>
-  Object.fromEntries(ALL_TABS.map((t) => [t, ""])) as Record<Tab, string>;
+const emptyHistories = () => emptyTabRecord<ChatMessage[]>(() => []);
+const emptyBools = () => emptyTabRecord(() => false);
+const emptyStrings = () => emptyTabRecord(() => "");
 
 export function QAGeneratorApp() {
   const [files, setFiles] = useState<File[]>([]);
@@ -751,6 +740,7 @@ export function QAGeneratorApp() {
                         revealed={revealedIds.has(item.id)}
                         onReveal={onReveal}
                         onUnreveal={onUnreveal}
+                        language={params.language}
                       />
                     ))
                   ))}
@@ -837,6 +827,7 @@ export function QAGeneratorApp() {
                         revealed={revealedIds.has(item.id)}
                         onReveal={onReveal}
                         onUnreveal={onUnreveal}
+                        language={params.language}
                       />
                     ))
                   ))}

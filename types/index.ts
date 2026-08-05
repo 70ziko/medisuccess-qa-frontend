@@ -123,6 +123,27 @@ export type MCQVariant = "hq" | "trial" | "qcu" | "exercise";
 
 export type Tab = "mcq" | "flashcards" | MCQVariant;
 
+export interface TabMeta {
+  id: Tab;
+  label: string;
+  /** Filename slug for the per-tab markdown download. */
+  slug: string;
+  /** Active-tab pill colours. */
+  color: { bg: string; text: string };
+}
+
+/** Single source of truth for the output tabs — order, labels, download slugs,
+ *  and active colours. Consumed by the toolbar, the app shell, and the export
+ *  helpers so a new tab only has to be described once. */
+export const TABS: TabMeta[] = [
+  { id: "mcq", label: "MCQ", slug: "mcq", color: { bg: "#ffedd5", text: "#c2410c" } },
+  { id: "flashcards", label: "Flashcards", slug: "flashcards", color: { bg: "#dbeafe", text: "#1d4ed8" } },
+  { id: "hq", label: "MCQ – HQ", slug: "mcq-hq", color: { bg: "#ede9fe", text: "#6d28d9" } },
+  { id: "trial", label: "Trial", slug: "trial", color: { bg: "#dcfce7", text: "#15803d" } },
+  { id: "qcu", label: "QCU", slug: "qcu", color: { bg: "#fce7f3", text: "#be185d" } },
+  { id: "exercise", label: "Exercises", slug: "exercises", color: { bg: "#fef9c3", text: "#a16207" } },
+];
+
 /** On-demand generation of a single section. Exactly one of the result fields
  *  is populated, depending on the section kind. */
 export interface GenerateSectionResponse {
@@ -130,28 +151,6 @@ export interface GenerateSectionResponse {
   mcqs?: MCQ[];
   flashcards?: Flashcard[];
 }
-
-/** Maps a variant tab to its count field in GenerateParams. */
-export const VARIANT_COUNT_KEY: Record<
-  MCQVariant,
-  "hq_count" | "trial_count" | "qcu_count" | "exercise_count"
-> = {
-  hq: "hq_count",
-  trial: "trial_count",
-  qcu: "qcu_count",
-  exercise: "exercise_count",
-};
-
-/** Maps a variant tab to its adaptive ("Auto") flag in GenerateParams. */
-export const VARIANT_ADAPTIVE_KEY: Record<
-  MCQVariant,
-  "hq_adaptive" | "trial_adaptive" | "qcu_adaptive" | "exercise_adaptive"
-> = {
-  hq: "hq_adaptive",
-  trial: "trial_adaptive",
-  qcu: "qcu_adaptive",
-  exercise: "exercise_adaptive",
-};
 
 /** Maps any tab to its count field in GenerateParams. */
 export const TAB_COUNT_KEY: Record<
