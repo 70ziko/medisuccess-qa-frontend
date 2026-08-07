@@ -244,8 +244,18 @@ function formatImageMarkdown(images?: string[]): string {
   );
 }
 
+// Un marqueur Vrai/Faux que le modèle a laissé au début de la justification.
+// Le séparateur est obligatoire, sinon "Vraisemblablement…" serait tronqué.
+const LEADING_VERDICT_RE = /^\s*(?:vrai|faux|true|false)\b\s*[-–—:.]\s*/i;
+
 // Original QCM schema for the internal variants (hq / trial / qcu / exercise);
 // it feeds an import system, so keep the headings and structure exactly.
+//
+// The importer (MediSuccess-Front `components/admin/**/CreateQCM*.tsx`) reads a
+// correction line with /^([A-K])\.\s*(Vrai|Faux)\s*[-–—]\s*(.*)$/ and derives
+// `correct_answers` from the "Vrai" markers. A line without the marker matches
+// nothing, so the whole correction AND the answer key are dropped silently —
+// the marker below is what makes the export importable, not decoration.
 export function mcqImportMarkdown(mcqs: GenerateResponse["mcqs"]): string {
   return mcqs
     .map((q) => {
@@ -253,7 +263,14 @@ export function mcqImportMarkdown(mcqs: GenerateResponse["mcqs"]): string {
         .map((o) => `${o.label}. ${o.text}`)
         .join("\n");
       const corrections = q.options
-        .map((o) => `${o.label}. ${o.justification}`)
+        .map((o) => {
+          // The verdict is carried structurally by `is_correct`; the validator
+          // normally strips it out of the justification text, but strip it again
+          // here so a leaked marker is not doubled ("A. Vrai - Vrai – …").
+          const verdict = o.is_correct ? "Vrai" : "Faux";
+          const text = o.justification.replace(LEADING_VERDICT_RE, "").trim();
+          return `${o.label}. ${verdict} - ${text}`;
+        })
         .join("\n");
       const imageMd = formatImageMarkdown(q.images);
       return (
