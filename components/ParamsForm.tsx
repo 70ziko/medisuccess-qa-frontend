@@ -105,7 +105,7 @@ function CountField({
         <input
           type="number"
           min={1}
-          max={50}
+          max={100}
           value={adaptive ? "" : value}
           disabled={adaptive || !enabled}
           placeholder={adaptive ? "Auto" : undefined}
