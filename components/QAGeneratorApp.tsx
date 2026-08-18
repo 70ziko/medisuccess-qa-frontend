@@ -231,7 +231,14 @@ export function QAGeneratorApp() {
           setPhase((p) => (p === "loading" ? "streaming" : p));
           markGenerated("flashcards");
           setLoadingTabs((s) => ({ ...s, flashcards: false }));
+        } else if (event.type === "mcq_partial") {
+          setMcqs((prev) => [...prev, ...event.data]);
+          markGenerated("mcq");
+          setLoadingTabs((s) => ({ ...s, mcq: false }));
+          setPhase((p) => (p === "loading" ? "streaming" : p));
         } else if (event.type === "mcq_result") {
+          // Autoritatif : remplace les partiels (le flux a pu retomber sur
+          // l'appel non streamé, qui régénère l'ensemble).
           setMcqs(event.data);
           markGenerated("mcq");
           setLoadingTabs((s) => ({ ...s, mcq: false }));
