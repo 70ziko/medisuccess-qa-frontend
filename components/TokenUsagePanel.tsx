@@ -21,7 +21,10 @@ const TAB_STAGES: Record<Tab, string[]> = {
   mcq:        ["mcq_generation",   "mcq_validation"],
   flashcards: ["flashcards"],
   hq:         ["hq_generation",    "hq_validation"],
-  trial:      ["trial_generation", "trial_validation"],
+  // Trial is a mix: its QRU and exercise slices bill under trial_* keys.
+  trial:      ["trial_generation", "trial_validation",
+               "trial_qcu_generation", "trial_qcu_validation",
+               "trial_exercise_generation"],
   qcu:        ["qcu_generation",   "qcu_validation"],
   // Exercises produce structured output directly — generation only.
   exercise:   ["exercise_generation"],
@@ -35,6 +38,9 @@ const STAGE_LABELS: Record<string, string> = {
   hq_validation:    "Validation",
   trial_generation: "Generation",
   trial_validation: "Validation",
+  trial_qcu_generation:      "QRU generation",
+  trial_qcu_validation:      "QRU validation",
+  trial_exercise_generation: "Exercise generation",
   qcu_generation:   "Generation",
   qcu_validation:   "Validation",
   exercise_generation: "Generation",

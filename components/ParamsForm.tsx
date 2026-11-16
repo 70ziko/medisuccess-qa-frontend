@@ -263,7 +263,7 @@ export function ParamsForm({ params, onChange }: Props) {
           onEnabledChange={(b) => set("hq_enabled", b)}
         />
         <CountField
-          label="Trial"
+          label="Trial — mix QCM / QRU / exercices"
           value={params.trial_count}
           adaptive={params.trial_adaptive}
           enabled={params.trial_enabled}

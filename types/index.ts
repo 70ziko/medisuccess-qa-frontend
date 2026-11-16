@@ -13,7 +13,11 @@ export interface MCQ {
   options: MCQOption[];
   /** Data URLs of image(s) attached to this question via chat refinement. */
   images?: string[];
+  /** Item type inside a mixed trial set; null/absent everywhere else. */
+  kind?: MCQKind | null;
 }
+
+export type MCQKind = "qcm" | "qcu" | "exercise";
 
 export interface Flashcard {
   id: string;

@@ -1,8 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import type { GenerateParams, MCQ, MCQLabel } from "@/types";
+import type { GenerateParams, MCQ, MCQKind, MCQLabel } from "@/types";
 import { Icon } from "./Icons";
+
+const KIND_LABELS: Record<MCQKind, string> = {
+  qcm: "QCM",
+  qcu: "QRU",
+  exercise: "Exercice",
+};
 
 interface Props {
   item: MCQ;
@@ -78,6 +84,24 @@ export function MCQCard({
         >
           Q{index + 1}
         </span>
+        {item.kind && (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)",
+              borderRadius: 5,
+              padding: "2px 7px",
+              marginTop: 1,
+              flexShrink: 0,
+              fontFamily: "var(--mono)",
+              letterSpacing: "0.05em",
+            }}
+          >
+            {KIND_LABELS[item.kind]}
+          </span>
+        )}
         <p
           style={{
             fontWeight: 500,
