@@ -548,6 +548,40 @@ export function DiagramCard({
         </div>
       )}
 
+      {result && result.moderation && (
+        <Box tone="amber">
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, marginBottom: 4 }}>
+            <Icon name="alert" size={13} /> Blocked by OpenAI&apos;s safety filter
+          </div>
+          <div>
+            OpenAI refused {result.moderation.blocked} redraw{result.moderation.blocked > 1 ? "s" : ""}.{" "}
+            {result.moderation.reasons.length > 0 ? (
+              <>
+                Reason given: <b>{result.moderation.reasons.join(", ")}</b>.
+              </>
+            ) : (
+              "OpenAI gave no reason, only “rejected by the safety system”."
+            )}
+          </div>
+          {result.status === "source_fallback" && (
+            <div style={{ marginTop: 4 }}>
+              No AI redraw is used here: the image is your uploaded drawing with its labels erased and the numbers
+              added by the server. The legend still matches those numbers. Running it again can pass.
+            </div>
+          )}
+          {result.moderation.request_ids.length > 0 && (
+            <details style={{ marginTop: 6, fontSize: 12 }}>
+              <summary style={{ cursor: "pointer" }}>OpenAI request IDs (for support)</summary>
+              <div style={{ fontFamily: "var(--mono)", marginTop: 4, wordBreak: "break-all" }}>
+                {result.moderation.request_ids.map((id) => (
+                  <div key={id}>{id}</div>
+                ))}
+              </div>
+            </details>
+          )}
+        </Box>
+      )}
+
       {result && result.warnings.length > 0 && (
         <Box tone="amber">
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, marginBottom: 4 }}>
@@ -564,14 +598,17 @@ export function DiagramCard({
       {result && result.attempts.length > 0 && (
         <details>
           <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>
-            {result.attempts.length} redraw attempt{result.attempts.length > 1 ? "s" : ""} · {result.seconds.toFixed(0)} s
+            {result.attempts.length} redraw attempt{result.attempts.length > 1 ? "s" : ""}
+            {result.moderation ? ` (${result.moderation.blocked} blocked)` : ""} · {result.seconds.toFixed(0)} s
             {result.rotation_clockwise ? ` · source turned ${result.rotation_clockwise}°` : ""}
           </summary>
           <ol style={{ margin: "6px 0 0", paddingLeft: 20, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
             {result.attempts.map((a) => (
               <li key={a.attempt}>
                 {a.error
-                  ? `${a.error_code === "moderation_blocked" ? "Blocked by moderation" : "Failed"}: ${a.error}`
+                  ? a.error_code === "moderation_blocked"
+                    ? `${a.error}${a.request_id ? ` (${a.request_id})` : ""}`
+                    : `Failed: ${a.error}`
                   : a.issues.length
                     ? `Rejected: ${a.issues.join("; ")}`
                     : "Verified"}

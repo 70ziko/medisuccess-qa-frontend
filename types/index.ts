@@ -224,6 +224,18 @@ export interface DiagramAttempt {
   issues: string[];
   error: string | null;
   error_code: string | null;
+  /** OpenAI's id for a failed call; its support asks for it. */
+  request_id?: string | null;
+}
+
+/** Present when OpenAI's safety filter refused at least one redraw of this diagram. */
+export interface DiagramModeration {
+  blocked: number;
+  /** Blocks tolerated before the numbered source is returned. */
+  max_blocked: number;
+  /** Categories OpenAI named (e.g. "sexual"); empty when it gave none. */
+  reasons: string[];
+  request_ids: string[];
 }
 
 export interface DiagramResult {
@@ -241,6 +253,7 @@ export interface DiagramResult {
   warnings: string[];
   kept_text: string[];
   attempts: DiagramAttempt[];
+  moderation: DiagramModeration | null;
   /** Debug only (Boxes tab): remove with backend app/pipeline/diagram_debug.py. */
   debug?: DiagramDebug;
   rotation_clockwise: number;
