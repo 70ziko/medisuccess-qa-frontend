@@ -210,3 +210,68 @@ export const TAB_ENABLED_KEY: Record<
   qcu: "qcu_enabled",
   exercise: "exercise_enabled",
 };
+
+// ── Numbered diagrams (/qa/diagrams) ───────────────────────────────────────
+
+/** One callout: the number printed on the image and the structure it names. */
+export interface DiagramLegendEntry {
+  numero: number;
+  label: string;
+}
+
+export interface DiagramAttempt {
+  attempt: number;
+  issues: string[];
+  error: string | null;
+  error_code: string | null;
+}
+
+export interface DiagramResult {
+  /** "verified": the redraw passed the number-by-number check.
+   *  "source_fallback": no redraw passed; `image` is the numbered source. */
+  status: "verified" | "source_fallback";
+  /** PNG data URL of the returned image. */
+  image: string;
+  /** Closest unverified redraw, only on "source_fallback". */
+  redraw_image: string | null;
+  legend: DiagramLegendEntry[];
+  warnings: string[];
+  kept_text: string[];
+  attempts: DiagramAttempt[];
+  rotation_clockwise: number;
+  usage: TokenUsage;
+  seconds: number;
+}
+
+export interface DiagramError {
+  message: string;
+  code: string;
+  /** Running the same image again may succeed (rate limit, refusal, flag…). */
+  retryable: boolean;
+  request_id?: string | null;
+}
+
+export type DiagramStage =
+  | "queued"
+  | "orient"
+  | "text"
+  | "reread"
+  | "numbered"
+  | "redraw"
+  | "blocked"
+  | "redraw_failed"
+  | "verify"
+  | "checked";
+
+export type DiagramEvent =
+  | {
+      type: "progress";
+      stage: DiagramStage;
+      message: string;
+      attempt?: number;
+      max_attempts?: number;
+      labels?: number;
+      issues?: string[];
+    }
+  | { type: "diagram_result"; data: DiagramResult }
+  | ({ type: "error"; usage?: TokenUsage } & DiagramError);

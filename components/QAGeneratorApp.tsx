@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import officialLogo from "@/assets/Official Logo round.png";
 import type {
   ChatMessage,
   Flashcard,
@@ -27,6 +26,7 @@ import { OutputToolbar } from "./OutputToolbar";
 import { ChatBar } from "./ChatBar";
 import { TokenUsagePanel } from "./TokenUsagePanel";
 import { Icon, LoaderDots } from "./Icons";
+import { AppHeader } from "./AppHeader";
 
 interface FlashcardGroup {
   source: string | null;
@@ -88,7 +88,8 @@ const emptyHistories = () => emptyTabRecord<ChatMessage[]>(() => []);
 const emptyBools = () => emptyTabRecord(() => false);
 const emptyStrings = () => emptyTabRecord(() => "");
 
-export function QAGeneratorApp() {
+/** `header` replaces the logo block, so the staff shell can add its mode switch. */
+export function QAGeneratorApp({ header }: { header?: React.ReactNode } = {}) {
   const [files, setFiles] = useState<File[]>([]);
   const [params, setParams] = useState<GenerateParams>(DEFAULT_PARAMS);
   const [phase, setPhase] = useState<GenerationPhase>("idle");
@@ -475,50 +476,7 @@ export function QAGeneratorApp() {
           overflow: "auto",
         }}
       >
-        {/* Logo */}
-        <div
-          style={{
-            padding: "18px 20px 14px",
-            borderBottom: "1px solid var(--border)",
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-          }}
-        >
-          <img
-            src={officialLogo.src}
-            alt="MediSuccess logo"
-            width={32}
-            height={32}
-            style={{
-              width: 32,
-              height: 32,
-              display: "block",
-              borderRadius: 999,
-              objectFit: "cover",
-            }}
-          />
-          <div>
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: 13.5,
-                letterSpacing: "-0.01em",
-              }}
-            >
-              MediSuccess
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--text-muted)",
-                letterSpacing: "0.02em",
-              }}
-            >
-              Q&A Generator
-            </div>
-          </div>
-        </div>
+        {header ?? <AppHeader />}
 
         <div
           style={{

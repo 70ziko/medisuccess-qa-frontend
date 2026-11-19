@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ChatResponse,
+  DiagramEvent,
   Flashcard,
   GenerateParams,
   GenerateResponse,
@@ -82,7 +83,11 @@ function authHeader(): string {
   return "Basic " + btoa(`${user}:${pass}`);
 }
 
-async function errorFromResponse(res: Response, prefix: string): Promise<Error> {
+/** An HTTP error from the API; `status` lets callers tell retryable failures apart,
+ *  `midStream` marks a stream that was accepted and then cut. */
+export type HttpError = Error & { status?: number; midStream?: boolean };
+
+async function errorFromResponse(res: Response, prefix: string): Promise<HttpError> {
   let detail = "";
   try {
     const text = await res.text();
@@ -106,7 +111,11 @@ async function errorFromResponse(res: Response, prefix: string): Promise<Error> 
     // network/stream read failure — fall through to the status line
   }
   detail = detail.trim();
-  return new Error(detail || `${prefix} (${res.status} ${res.statusText})`.trim());
+  const error: HttpError = new Error(
+    detail || `${prefix} (${res.status} ${res.statusText})`.trim()
+  );
+  error.status = res.status;
+  return error;
 }
 
 async function fetchWithBasicAuth(
@@ -124,6 +133,31 @@ async function fetchWithBasicAuth(
   }
   clearCredentials();
   return fetch(input, withAuth());
+}
+
+/** Read a `data: {...}\n\n` event stream, calling `onEvent` per event until it ends. */
+async function readSSE<E>(res: Response, onEvent: (e: E) => void): Promise<void> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const line = chunk.split("\n").find((l) => l.startsWith("data: "));
+      if (line) {
+        try {
+          onEvent(JSON.parse(line.slice(6)));
+        } catch {
+          // skip malformed line
+        }
+      }
+    }
+  }
 }
 
 export function startGenerationStream(
@@ -147,33 +181,65 @@ export function startGenerationStream(
         onError(await errorFromResponse(res, "Server error"));
         return;
       }
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split("\n\n");
-        buffer = chunks.pop() ?? "";
-        for (const chunk of chunks) {
-          const line = chunk.split("\n").find((l) => l.startsWith("data: "));
-          if (line) {
-            try {
-              onEvent(JSON.parse(line.slice(6)));
-            } catch {
-              // skip malformed line
-            }
-          }
-        }
-      }
+      await readSSE(res, onEvent);
     })
     .catch((err) => {
       if (err.name !== "AbortError") onError(err as Error);
     });
 
   return () => controller.abort();
+}
+
+/** Number one diagram. `onEnd` fires once the stream closes, whatever it carried;
+ *  `onError` gets HTTP and network failures (not the stream's own `error` event).
+ *  Returns an abort function. */
+export function startDiagramStream(
+  file: File,
+  onEvent: (e: DiagramEvent) => void,
+  onError: (err: HttpError) => void,
+  onEnd: () => void
+): () => void {
+  const controller = new AbortController();
+  const form = new FormData();
+  form.append("file", file);
+
+  fetchWithBasicAuth(`${BASE}/qa/diagrams`, {
+    method: "POST",
+    body: form,
+    signal: controller.signal,
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        onError(await errorFromResponse(res, "Server error"));
+        return;
+      }
+      try {
+        await readSSE(res, onEvent);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") (err as HttpError).midStream = true;
+        throw err;
+      }
+      onEnd();
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") onError(err as HttpError);
+    });
+
+  return () => controller.abort();
+}
+
+/** Render a PDF's pages as JPEG data URLs, one diagram per page. */
+export async function splitPdfPages(
+  file: File
+): Promise<{ page: number; image: string }[]> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetchWithBasicAuth(`${BASE}/qa/diagrams/pages`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw await errorFromResponse(res, "PDF error");
+  return (await res.json()).pages;
 }
 
 export async function sendChatMessage(args: {

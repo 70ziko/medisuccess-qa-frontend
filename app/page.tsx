@@ -1,5 +1,5 @@
-import { QAGeneratorApp } from "@/components/QAGeneratorApp";
+import { StaffApp } from "@/components/StaffApp";
 
 export default function Home() {
-  return <QAGeneratorApp />;
+  return <StaffApp />;
 }
