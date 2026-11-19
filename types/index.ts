@@ -241,6 +241,8 @@ export interface DiagramResult {
   warnings: string[];
   kept_text: string[];
   attempts: DiagramAttempt[];
+  /** Debug only (Boxes tab): remove with backend app/pipeline/diagram_debug.py. */
+  debug?: DiagramDebug;
   rotation_clockwise: number;
   usage: TokenUsage;
   seconds: number;
@@ -279,3 +281,29 @@ export type DiagramEvent =
     }
   | { type: "diagram_result"; data: DiagramResult }
   | ({ type: "error"; usage?: TokenUsage } & DiagramError);
+
+// Debug only: the reading step's boxes (components/DiagramBoxes.tsx).
+export interface DiagramDebugItem {
+  text: string;
+  role: "label" | "keep" | "remove";
+  /** [x0, y0, x1, y1] in pixels of the upright `width`×`height` frame. */
+  box: [number, number, number, number];
+  anchor: string;
+  panel: number;
+  legend: string;
+  numero: number | null;
+  /** Second reading outcome: "misaimed", "blank", "changed". */
+  flags: string[];
+  second_reading: string | null;
+  first_reading?: string;
+}
+
+export interface DiagramDebug {
+  width: number;
+  height: number;
+  box_scale: [number, number];
+  dropped: string[];
+  source_image: string;
+  stamped_image: string;
+  items: DiagramDebugItem[];
+}

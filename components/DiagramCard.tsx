@@ -6,6 +6,7 @@ import type { DiagramChoice, DiagramJob } from "@/lib/diagram-queue";
 import { MAX_AUTO_RETRIES, exportedImage } from "@/lib/diagram-queue";
 import { downloadDataUrl, ficheJson, hasNumberingGap, outputName } from "@/lib/diagram-export";
 import { Icon, IconBtn, LoaderDots } from "./Icons";
+import { DiagramBoxes } from "./DiagramBoxes";
 import { ModeSwitch } from "./ModeSwitch";
 
 type Tone = "muted" | "accent" | "green" | "amber" | "red";
@@ -163,7 +164,7 @@ export function DiagramCard({
   onMode,
   onZoom,
 }: Props) {
-  const [view, setView] = useState<"result" | "original">("result");
+  const [view, setView] = useState<"result" | "original" | "boxes">("result");
   const [copied, setCopied] = useState(false);
   const pill = TONES[status(job).tone];
   const result = job.result;
@@ -361,7 +362,8 @@ export function DiagramCard({
       {result && (
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 2, background: "var(--bg)", borderRadius: 8, padding: 3, alignSelf: "flex-start" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 2, background: "var(--bg)", borderRadius: 8, padding: 3 }}>
               {[...resultTabs(result), ["original", "Original"] as const].map(([id, label]) => {
                 const selected = id === "original" ? view === "original" : view === "result" && job.choice === id;
                 return (
@@ -389,7 +391,30 @@ export function DiagramCard({
                   </button>
                 );
               })}
+              </div>
+              {result.debug && (
+                <button
+                  onClick={() => setView(view === "boxes" ? "result" : "boxes")}
+                  title="Debug: the text boxes the reading step found"
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: `1px dashed ${view === "boxes" ? "var(--amber)" : "var(--border)"}`,
+                    background: view === "boxes" ? "var(--amber-light)" : "transparent",
+                    color: view === "boxes" ? "var(--amber)" : "var(--text-muted)",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    fontFamily: "var(--font)",
+                  }}
+                >
+                  Boxes (debug)
+                </button>
+              )}
             </div>
+            {view === "boxes" && result.debug ? (
+              <DiagramBoxes debug={result.debug} />
+            ) : (
             <button
               onClick={() => onZoom(shown, job.name)}
               style={{ padding: 0, border: "none", background: "none", cursor: "zoom-in" }}
@@ -409,6 +434,7 @@ export function DiagramCard({
                 }}
               />
             </button>
+            )}
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <SmallButton primary onClick={() => exported && downloadDataUrl(exported, outputName(job.stem))}>
                 <Icon name="download" size={12} /> Download PNG
