@@ -192,16 +192,19 @@ export function startGenerationStream(
 
 /** Number one diagram. `onEnd` fires once the stream closes, whatever it carried;
  *  `onError` gets HTTP and network failures (not the stream's own `error` event).
+ *  `redraw: false` returns the numbered source without the AI redraw.
  *  Returns an abort function. */
 export function startDiagramStream(
   file: File,
   onEvent: (e: DiagramEvent) => void,
   onError: (err: HttpError) => void,
-  onEnd: () => void
+  onEnd: () => void,
+  { redraw = true }: { redraw?: boolean } = {}
 ): () => void {
   const controller = new AbortController();
   const form = new FormData();
   form.append("file", file);
+  form.append("redraw", String(redraw));
 
   fetchWithBasicAuth(`${BASE}/qa/diagrams`, {
     method: "POST",

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MAX_AUTO_RETRIES, exportedImage, useDiagramQueue } from "@/lib/diagram-queue";
+import { MAX_AUTO_RETRIES, exportedImage, legendEdited, needsRun, useDiagramQueue } from "@/lib/diagram-queue";
 import { batchJson, dataUrlToBytes, downloadBlob, outputName, zipStore } from "@/lib/diagram-export";
 import { PDFDropzone } from "./PDFDropzone";
 import { DiagramCard } from "./DiagramCard";
 import { AppHeader } from "./AppHeader";
 import { Icon, IconBtn, Pill } from "./Icons";
+import { ModeSwitch } from "./ModeSwitch";
 
 const PARALLEL_CHOICES = [1, 2, 3, 4];
 
@@ -38,13 +39,16 @@ function ToolbarButton({ onClick, children }: { onClick: () => void; children: R
 /** Staff tool: number the labels of anatomy diagrams, several at a time. */
 export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
   const [parallel, setParallel] = useState(3);
+  const [redraw, setRedraw] = useState(true);
   const [zoom, setZoom] = useState<{ src: string; title: string } | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
-  const q = useDiagramQueue(parallel);
+  const q = useDiagramQueue(parallel, redraw);
   const { jobs } = q;
 
   const count = (pred: (s: string) => boolean) => jobs.filter((j) => pred(j.state)).length;
-  const ready = count((s) => s === "ready");
+  const pending = jobs.filter(needsRun);
+  const ready = pending.length;
+  const mixed = new Set(jobs.map((j) => j.redraw)).size > 1;
   const running = count((s) => s === "running");
   const waiting = count((s) => s === "queued" || s === "retry_wait");
   const failed = count((s) => s === "error" || s === "stopped");
@@ -78,6 +82,12 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
       { name: "legendes.json", data: new TextEncoder().encode(json) },
     ]);
     downloadBlob(zip, "schemas-numerotes.zip");
+  };
+
+  const startPending = () => {
+    const edited = pending.filter(legendEdited).length;
+    if (edited && !window.confirm(`Running again replaces your legend edits on ${edited} diagram(s). Continue?`)) return;
+    q.startPending();
   };
 
   const clearAll = () => {
@@ -114,6 +124,27 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
           )}
 
           <div>
+            <div style={{ fontSize: 11, fontWeight: 500, color: "var(--text-muted)", marginBottom: 5 }}>
+              Output, all diagrams
+            </div>
+            <ModeSwitch
+              redraw={mixed ? null : redraw}
+              onChange={(value) => {
+                setRedraw(value);
+                q.setAllModes(value);
+              }}
+            />
+            <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+              {mixed
+                ? `Mixed: each card has its own switch. Pick one here to set them all; new diagrams get ${redraw ? "AI redraw" : "Numbers only"}.`
+                : redraw
+                  ? "Redrawn in the MediSuccess style by the image model, then checked number by number. The numbers-only version comes with it."
+                  : "No image model: the source is turned upright, its labels erased and numbered by code, and its orientation marker redrawn cleanly. Faster, cheaper, never blocked by moderation."}
+              {!mixed && " Each card can switch on its own."}
+            </p>
+          </div>
+
+          <div>
             <label
               htmlFor="diagram-parallel"
               style={{ fontSize: 11, fontWeight: 500, color: "var(--text-muted)", display: "block", marginBottom: 5 }}
@@ -147,9 +178,9 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
           </div>
 
           <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.55 }}>
-            Each diagram is read, numbered, redrawn in the MediSuccess style, then checked number by number
-            (a few minutes each). Redraws blocked by moderation are retried on the server; other failures that can
-            pass on a new try are retried {MAX_AUTO_RETRIES} times here.
+            An AI redraw takes a few minutes per diagram, numbers only a minute or two. Redraws blocked by moderation
+            are retried on the server; other failures that can pass on a new try are retried {MAX_AUTO_RETRIES} times
+            here. Switching a numbers-only result to AI redraw queues it for a new run.
           </div>
 
           <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
@@ -177,7 +208,7 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
               </button>
             )}
             <button
-              onClick={q.startReady}
+              onClick={startPending}
               disabled={ready === 0}
               style={{
                 padding: "11px 0",
@@ -255,7 +286,7 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
               {done.length > 0 && <Pill color="green">{done.length} done</Pill>}
               {running > 0 && <Pill color="accent">{running} running</Pill>}
               {waiting > 0 && <Pill color="muted">{waiting} waiting</Pill>}
-              {ready > 0 && <Pill color="muted">{ready} ready</Pill>}
+              {ready > 0 && <Pill color="muted">{ready} to run</Pill>}
               {failed > 0 && <Pill color="muted">{failed} failed or stopped</Pill>}
               {totalCost > 0 && (
                 <span
@@ -333,6 +364,7 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
                   onEditLabel={(numero, label) => q.editLabel(job.id, numero, label)}
                   onResetLegend={() => q.resetLegend(job.id)}
                   onChoice={(choice) => q.setChoice(job.id, choice)}
+                  onMode={(value) => q.setMode(job.id, value)}
                   onZoom={(src, title) => setZoom({ src, title })}
                 />
               ))}

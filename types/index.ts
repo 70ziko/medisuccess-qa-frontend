@@ -228,12 +228,15 @@ export interface DiagramAttempt {
 
 export interface DiagramResult {
   /** "verified": the redraw passed the number-by-number check.
-   *  "source_fallback": no redraw passed; `image` is the numbered source. */
-  status: "verified" | "source_fallback";
+   *  "source_fallback": no redraw passed; `image` is the numbered source.
+   *  "numbers_only": no redraw asked for; `image` is the numbered source, turned upright. */
+  status: "verified" | "source_fallback" | "numbers_only";
   /** PNG data URL of the returned image. */
   image: string;
   /** Closest unverified redraw, only on "source_fallback". */
   redraw_image: string | null;
+  /** Numbers placed by code on the upright source, only on "verified" (otherwise it already is `image`). */
+  numbered_image?: string | null;
   legend: DiagramLegendEntry[];
   warnings: string[];
   kept_text: string[];
@@ -256,6 +259,7 @@ export type DiagramStage =
   | "orient"
   | "text"
   | "reread"
+  | "axes"
   | "numbered"
   | "redraw"
   | "blocked"

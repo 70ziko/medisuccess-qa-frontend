@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { DiagramJob } from "@/lib/diagram-queue";
+import type { DiagramResult } from "@/types";
+import type { DiagramChoice, DiagramJob } from "@/lib/diagram-queue";
 import { MAX_AUTO_RETRIES, exportedImage } from "@/lib/diagram-queue";
 import { downloadDataUrl, ficheJson, hasNumberingGap, outputName } from "@/lib/diagram-export";
 import { Icon, IconBtn, LoaderDots } from "./Icons";
+import { ModeSwitch } from "./ModeSwitch";
 
 type Tone = "muted" | "accent" | "green" | "amber" | "red";
 
@@ -27,9 +29,9 @@ function status(job: DiagramJob): { label: string; tone: Tone } {
     case "retry_wait":
       return { label: "Retrying", tone: "amber" };
     case "done":
-      return job.result?.status === "verified"
-        ? { label: "Verified", tone: "green" }
-        : { label: "Numbered source", tone: "amber" };
+      if (job.result?.status === "verified") return { label: "Verified", tone: "green" };
+      if (job.result?.status === "numbers_only") return { label: "Numbers only", tone: "green" };
+      return { label: "Numbered source", tone: "amber" };
     case "error":
       return { label: "Failed", tone: "red" };
     case "stopped":
@@ -39,7 +41,14 @@ function status(job: DiagramJob): { label: string; tone: Tone } {
 
 // Rough share of the run done at each stage; the redraw loop fills the last half.
 function progressShare(job: DiagramJob): number {
-  const fixed: Record<string, number> = { queued: 0.02, orient: 0.08, text: 0.18, reread: 0.32, numbered: 0.42 };
+  const fixed: Record<string, number> = {
+    queued: 0.02,
+    orient: 0.08,
+    text: 0.18,
+    reread: 0.32,
+    axes: 0.38,
+    numbered: 0.42,
+  };
   if (!job.stage) return 0.02;
   if (job.stage in fixed) return fixed[job.stage];
   const total = Math.max(job.maxAttempts, 1);
@@ -117,8 +126,29 @@ interface Props {
   onRemove: () => void;
   onEditLabel: (numero: number, label: string) => void;
   onResetLegend: () => void;
-  onChoice: (choice: "final" | "redraw") => void;
+  onChoice: (choice: DiagramChoice) => void;
+  /** This diagram's mode: AI redraw or numbers only. */
+  onMode: (redraw: boolean) => void;
   onZoom: (src: string, title: string) => void;
+}
+
+/** View tabs for a result: what it holds depends on how the run ended. */
+function resultTabs(result: DiagramResult): [DiagramChoice, string][] {
+  if (result.status === "numbers_only") return [["final", "Numbers only"]];
+  if (result.status === "verified") {
+    return result.numbered_image
+      ? [
+          ["final", "AI redraw"],
+          ["numbered", "Numbers only"],
+        ]
+      : [["final", "AI redraw"]];
+  }
+  return result.redraw_image
+    ? [
+        ["final", "Numbers only"],
+        ["redraw", "Closest redraw (unverified)"],
+      ]
+    : [["final", "Numbers only"]];
 }
 
 export function DiagramCard({
@@ -130,6 +160,7 @@ export function DiagramCard({
   onEditLabel,
   onResetLegend,
   onChoice,
+  onMode,
   onZoom,
 }: Props) {
   const [view, setView] = useState<"result" | "original">("result");
@@ -185,6 +216,13 @@ export function DiagramCard({
         >
           {job.name}
         </span>
+        <ModeSwitch
+          compact
+          redraw={job.redraw}
+          onChange={onMode}
+          disabled={job.state === "running"}
+          title={job.state === "running" ? "Runs in the mode it started with" : "This diagram's output"}
+        />
         <span
           style={{
             fontSize: 11,
@@ -287,6 +325,15 @@ export function DiagramCard({
         </ul>
       )}
 
+      {job.state === "done" && job.redraw && result?.status === "numbers_only" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
+          <span>Set to AI redraw: the result below has numbers only. Run it again to get the redraw.</span>
+          <SmallButton onClick={runAgain}>
+            <Icon name="refresh" size={12} /> Run again
+          </SmallButton>
+        </div>
+      )}
+
       {/* Before a result: the source, small */}
       {!result && (
         <button
@@ -315,17 +362,7 @@ export function DiagramCard({
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", gap: 2, background: "var(--bg)", borderRadius: 8, padding: 3, alignSelf: "flex-start" }}>
-              {(result.redraw_image
-                ? ([
-                    ["final", "Numbered source"],
-                    ["redraw", "Closest redraw (unverified)"],
-                    ["original", "Original"],
-                  ] as const)
-                : ([
-                    ["final", "Numbered"],
-                    ["original", "Original"],
-                  ] as const)
-              ).map(([id, label]) => {
+              {[...resultTabs(result), ["original", "Original"] as const].map(([id, label]) => {
                 const selected = id === "original" ? view === "original" : view === "result" && job.choice === id;
                 return (
                   <button

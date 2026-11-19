@@ -49,11 +49,16 @@ export interface DiagramJob {
   result: DiagramResult | null;
   /** Staff-edited copy of `result.legend`; this is what gets exported. */
   legend: DiagramLegendEntry[];
-  /** Which image to export when the redraw did not pass verification. */
-  choice: "final" | "redraw";
+  /** Which image to export: the result, the closest unverified redraw, or a verified redraw's numbers-only version. */
+  choice: DiagramChoice;
+  /** Mode of the next run: AI redraw, or false = numbers placed by code on the upright source. Set on the card or,
+   *  for every diagram at once, by the panel switch. */
+  redraw: boolean;
   /** USD across every run of this image, failed ones included. */
   cost: number;
 }
+
+export type DiagramChoice = "final" | "redraw" | "numbered";
 
 export const MAX_AUTO_RETRIES = 2;
 const DIAGRAM_MIMES = ["image/png", "image/jpeg", "image/webp"];
@@ -108,7 +113,7 @@ function diagramMime(f: File): string | null {
   return null;
 }
 
-function newJob(file: File, name: string, stem: string, sourceKey: string): DiagramJob {
+function newJob(file: File, name: string, stem: string, sourceKey: string, redraw: boolean): DiagramJob {
   return {
     id: newId(),
     name,
@@ -131,6 +136,7 @@ function newJob(file: File, name: string, stem: string, sourceKey: string): Diag
     result: null,
     legend: [],
     choice: "final",
+    redraw,
     cost: 0,
   };
 }
@@ -138,8 +144,11 @@ function newJob(file: File, name: string, stem: string, sourceKey: string): Diag
 const keyOf = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
 const ACTIVE: DiagramJobState[] = ["queued", "running", "retry_wait"];
 
-export function useDiagramQueue(parallel: number) {
+/** `redraw`: the mode new diagrams get when dropped. */
+export function useDiagramQueue(parallel: number, redraw = true) {
   const [jobs, setJobs] = useState<DiagramJob[]>([]);
+  const defaultRedraw = useRef(redraw);
+  defaultRedraw.current = redraw;
   const [notices, setNotices] = useState<string[]>([]);
   const [splitting, setSplitting] = useState<string[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -240,7 +249,8 @@ export function useDiagramQueue(parallel: number) {
           if (!live() || finished) return;
           finished = true;
           fail(job.id, STREAM_CLOSED);
-        }
+        },
+        { redraw: job.redraw }
       );
       runs.current.set(job.id, { token, stop });
     },
@@ -294,7 +304,10 @@ export function useDiagramQueue(parallel: number) {
     }
     const images = fresh.filter((f) => !isPdf(f) && diagramMime(f));
     if (images.length) {
-      setJobs((js) => [...js, ...images.map((f) => newJob(f, f.name, stemOf(f.name), keyOf(f)))]);
+      setJobs((js) => [
+        ...js,
+        ...images.map((f) => newJob(f, f.name, stemOf(f.name), keyOf(f), defaultRedraw.current)),
+      ]);
     }
     for (const pdf of fresh.filter(isPdf)) {
       setSplitting((s) => [...s, pdf.name]);
@@ -308,7 +321,8 @@ export function useDiagramQueue(parallel: number) {
               dataUrlToFile(p.image, `${stem}-p${p.page}.jpg`),
               `${pdf.name} · page ${p.page}`,
               `${stem}-p${p.page}`,
-              keyOf(pdf)
+              keyOf(pdf),
+              defaultRedraw.current
             )
           ),
         ]);
@@ -320,8 +334,11 @@ export function useDiagramQueue(parallel: number) {
     }
   }, []);
 
-  const startReady = useCallback(() => {
-    setJobs((js) => js.map((j) => (j.state === "ready" ? { ...j, state: "queued", autoRetries: 0 } : j)));
+  /** Starts every diagram that `needsRun`: new ones, and numbers-only results since switched to AI redraw. */
+  const startPending = useCallback(() => {
+    setJobs((js) =>
+      js.map((j) => (needsRun(j) ? { ...j, state: "queued", error: null, retryAt: null, autoRetries: 0 } : j))
+    );
   }, []);
 
   const stopJob = useCallback((id: string) => {
@@ -357,6 +374,16 @@ export function useDiagramQueue(parallel: number) {
     );
   }, []);
 
+  /** Mode of one diagram's next run; a running diagram keeps the mode it started with. */
+  const setMode = useCallback((id: string, redraw: boolean) => {
+    update(id, (j) => withMode(j, redraw));
+  }, [update]);
+
+  /** The panel switch: every diagram that is not running takes the mode. */
+  const setAllModes = useCallback((redraw: boolean) => {
+    setJobs((js) => js.map((j) => withMode(j, redraw)));
+  }, []);
+
   const remove = useCallback((id: string) => {
     runs.current.get(id)?.stop();
     runs.current.delete(id);
@@ -383,7 +410,7 @@ export function useDiagramQueue(parallel: number) {
     update(id, (j) => ({ ...j, legend: (j.result?.legend ?? []).map((e) => ({ ...e })) }));
   }, [update]);
 
-  const setChoice = useCallback((id: string, choice: "final" | "redraw") => {
+  const setChoice = useCallback((id: string, choice: DiagramChoice) => {
     update(id, (j) => ({ ...j, choice }));
   }, [update]);
 
@@ -397,7 +424,7 @@ export function useDiagramQueue(parallel: number) {
     notices,
     splitting,
     addFiles,
-    startReady,
+    startPending,
     stopJob,
     stopAll,
     retry,
@@ -407,12 +434,43 @@ export function useDiagramQueue(parallel: number) {
     editLabel,
     resetLegend,
     setChoice,
+    setMode,
+    setAllModes,
     dismissNotice,
   };
 }
 
-/** The image a job exports: the numbered result, or the closest redraw when staff picked it. */
+/** The mode applied to a finished diagram: a redraw run already holds its numbers-only version, so it is selected
+ *  without a new run. A running diagram keeps the mode it started with. */
+function withMode(job: DiagramJob, redraw: boolean): DiagramJob {
+  if (job.state === "running") return job;
+  const status = job.result?.status;
+  const choice: DiagramChoice =
+    status === "verified" && job.result?.numbered_image
+      ? redraw
+        ? "final"
+        : "numbered"
+      : redraw
+        ? job.choice
+        : "final";
+  return { ...job, redraw, choice };
+}
+
+/** Waiting for its first run, or holding a numbers-only result while set to AI redraw. */
+export function needsRun(job: DiagramJob): boolean {
+  return job.state === "ready" || (job.state === "done" && job.redraw && job.result?.status === "numbers_only");
+}
+
+/** Staff changed a label of the legend the server returned. */
+export function legendEdited(job: DiagramJob): boolean {
+  const result = job.result;
+  return !!result && job.legend.some((e, i) => e.label !== result.legend[i]?.label);
+}
+
+/** The image a job exports: its result, or the alternative staff picked on the card. */
 export function exportedImage(job: DiagramJob): string | null {
   if (!job.result) return null;
-  return job.choice === "redraw" && job.result.redraw_image ? job.result.redraw_image : job.result.image;
+  if (job.choice === "redraw" && job.result.redraw_image) return job.result.redraw_image;
+  if (job.choice === "numbered" && job.result.numbered_image) return job.result.numbered_image;
+  return job.result.image;
 }
