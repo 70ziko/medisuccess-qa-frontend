@@ -259,6 +259,30 @@ export interface DiagramResult {
   rotation_clockwise: number;
   usage: TokenUsage;
   seconds: number;
+  /** Sent back untouched with every follow-up run (chat, AI redraw), so the server can restart mid-pipeline. */
+  state: DiagramState | null;
+  /** After a follow-up run: the assistant's answer and the step the run restarted from. */
+  reply?: string;
+  entry?: DiagramEntry;
+}
+
+/** The server's reading of one drawing. Opaque here except for the chat's standing instructions. */
+export interface DiagramState {
+  read_notes: string[];
+  redraw_notes: string[];
+  role_overrides: unknown[];
+  added_markers: unknown[];
+  [key: string]: unknown;
+}
+
+/** The pipeline step a follow-up run restarted from; "answer" and "legend" do no image work. */
+export type DiagramEntry = "answer" | "legend" | "redraw" | "number" | "read" | "orient";
+
+export interface DiagramChatTurn {
+  role: "user" | "assistant";
+  text: string;
+  /** Assistant turns: where the run restarted. */
+  entry?: DiagramEntry;
 }
 
 export interface DiagramError {
@@ -271,6 +295,8 @@ export interface DiagramError {
 
 export type DiagramStage =
   | "queued"
+  | "route"
+  | "routed"
   | "orient"
   | "text"
   | "reread"
@@ -291,8 +317,21 @@ export type DiagramEvent =
       max_attempts?: number;
       labels?: number;
       issues?: string[];
+      /** "routed": where the follow-up run restarts, and whether it does any image work. */
+      entry?: DiagramEntry;
+      reply?: string;
+      runs?: boolean;
     }
   | { type: "diagram_result"; data: DiagramResult }
+  /** A follow-up run that needed no image work: the images stay as they are. */
+  | {
+      type: "diagram_reply";
+      message: string;
+      entry: DiagramEntry;
+      legend: DiagramLegendEntry[];
+      state: DiagramState;
+      usage: TokenUsage;
+    }
   | ({ type: "error"; usage?: TokenUsage } & DiagramError);
 
 // Debug only: the reading step's boxes (components/DiagramBoxes.tsx).

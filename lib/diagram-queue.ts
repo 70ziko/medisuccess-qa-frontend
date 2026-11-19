@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  DiagramChatTurn,
+  DiagramEntry,
   DiagramError,
   DiagramEvent,
   DiagramLegendEntry,
@@ -9,7 +11,7 @@ import type {
   DiagramStage,
   TokenUsage,
 } from "@/types";
-import { splitPdfPages, startDiagramStream, type HttpError } from "@/lib/qa-api";
+import { splitPdfPages, startDiagramRefine, startDiagramStream, type HttpError } from "@/lib/qa-api";
 import { dataUrlToFile, stemOf } from "@/lib/diagram-export";
 
 export type DiagramJobState =
@@ -56,9 +58,19 @@ export interface DiagramJob {
   redraw: boolean;
   /** USD across every run of this image, failed ones included. */
   cost: number;
+  /** Staff chat on this drawing, oldest first. */
+  chat: DiagramChatTurn[];
+  /** What the next run does instead of a fresh numbering; kept until it succeeds, so Retry resends it. */
+  pending: DiagramPending | null;
+  /** Where the current follow-up run restarted, once the server said. */
+  entry: DiagramEntry | null;
 }
 
 export type DiagramChoice = "final" | "redraw" | "numbered";
+
+/** A follow-up run on the last result: a chat message, the AI-redraw button, or a full run that keeps the chat's
+ *  instructions. */
+export type DiagramPending = { kind: "chat"; message: string } | { kind: "redraw" } | { kind: "rerun" };
 
 export const MAX_AUTO_RETRIES = 2;
 const DIAGRAM_MIMES = ["image/png", "image/jpeg", "image/webp"];
@@ -138,11 +150,20 @@ function newJob(file: File, name: string, stem: string, sourceKey: string, redra
     choice: "final",
     redraw,
     cost: 0,
+    chat: [],
+    pending: null,
+    entry: null,
   };
 }
 
 const keyOf = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
 const ACTIVE: DiagramJobState[] = ["queued", "running", "retry_wait"];
+const QUEUED = { state: "queued", error: null, retryAt: null, autoRetries: 0 } as const;
+
+/** The chat with the server's answer to a chat message appended; other follow-ups leave it as it is. */
+function answered(job: DiagramJob, reply: string | undefined, entry: DiagramEntry | undefined): DiagramChatTurn[] {
+  return job.pending?.kind === "chat" && reply ? [...job.chat, { role: "assistant", text: reply, entry }] : job.chat;
+}
 
 /** `redraw`: the mode new diagrams get when dropped. */
 export function useDiagramQueue(parallel: number, redraw = true) {
@@ -201,6 +222,7 @@ export function useDiagramQueue(parallel: number, redraw = true) {
         retryAt: null,
         startedAt: Date.now(),
         finishedAt: null,
+        entry: null,
       }));
 
       const onEvent = (e: DiagramEvent) => {
@@ -217,6 +239,7 @@ export function useDiagramQueue(parallel: number, redraw = true) {
             attempt: e.attempt ?? j.attempt,
             maxAttempts: e.max_attempts ?? j.maxAttempts,
             history: note ? [...j.history, note] : j.history,
+            entry: e.entry ?? j.entry,
           }));
         } else if (e.type === "diagram_result") {
           finished = true;
@@ -230,6 +253,23 @@ export function useDiagramQueue(parallel: number, redraw = true) {
             error: null,
             finishedAt: Date.now(),
             cost: j.cost + e.data.usage.total.cost,
+            chat: answered(j, e.data.reply, e.data.entry),
+            pending: null,
+          }));
+        } else if (e.type === "diagram_reply") {
+          // No image work: the images stay; a reworded legend shows as edits against the last result.
+          finished = true;
+          runs.current.delete(job.id);
+          update(job.id, (j) => ({
+            ...j,
+            state: "done",
+            result: j.result && { ...j.result, state: e.state },
+            legend: e.legend.map((x) => ({ ...x })),
+            error: null,
+            finishedAt: Date.now(),
+            cost: j.cost + e.usage.total.cost,
+            chat: answered(j, e.message, e.entry),
+            pending: null,
           }));
         } else if (e.type === "error") {
           finished = true;
@@ -237,21 +277,35 @@ export function useDiagramQueue(parallel: number, redraw = true) {
         }
       };
 
-      const stop = startDiagramStream(
-        job.file,
-        onEvent,
-        (err) => {
-          if (!live() || finished) return;
-          finished = true;
-          fail(job.id, httpToDiagramError(err));
-        },
-        () => {
-          if (!live() || finished) return;
-          finished = true;
-          fail(job.id, STREAM_CLOSED);
-        },
-        { redraw: job.redraw }
-      );
+      const onError = (err: HttpError) => {
+        if (!live() || finished) return;
+        finished = true;
+        fail(job.id, httpToDiagramError(err));
+      };
+      const onEnd = () => {
+        if (!live() || finished) return;
+        finished = true;
+        fail(job.id, STREAM_CLOSED);
+      };
+      const pending = job.pending;
+      const state = job.result?.state;
+      const stop =
+        pending && state
+          ? startDiagramRefine(
+              job.file,
+              {
+                state,
+                legend: job.legend,
+                redraw: job.redraw,
+                ...(pending.kind === "chat"
+                  ? { message: pending.message, history: job.chat.slice(0, -1) }
+                  : { entry: pending.kind === "redraw" ? "redraw" : "orient" }),
+              },
+              onEvent,
+              onError,
+              onEnd
+            )
+          : startDiagramStream(job.file, onEvent, onError, onEnd, { redraw: job.redraw });
       runs.current.set(job.id, { token, stop });
     },
     [fail, update]
@@ -334,10 +388,19 @@ export function useDiagramQueue(parallel: number, redraw = true) {
     }
   }, []);
 
-  /** Starts every diagram that `needsRun`: new ones, and numbers-only results since switched to AI redraw. */
+  /** Starts every diagram that `needsRun`: new ones, and numbers-only results since switched to AI redraw, which
+   *  get only the redraw on their existing reading. */
   const startPending = useCallback(() => {
     setJobs((js) =>
-      js.map((j) => (needsRun(j) ? { ...j, state: "queued", error: null, retryAt: null, autoRetries: 0 } : j))
+      js.map((j) =>
+        needsRun(j)
+          ? {
+              ...j,
+              ...QUEUED,
+              pending: j.state === "done" && j.result?.state ? { kind: "redraw" } : j.pending,
+            }
+          : j
+      )
     );
   }, []);
 
@@ -359,9 +422,39 @@ export function useDiagramQueue(parallel: number, redraw = true) {
     );
   }, []);
 
-  /** Manual start of a failed, stopped or finished job; gives it a fresh auto-retry budget. */
+  /** Manual start of a failed or stopped job, resending its pending follow-up if any; fresh auto-retry budget. */
   const retry = useCallback((id: string) => {
-    update(id, (j) => ({ ...j, state: "queued", error: null, retryAt: null, autoRetries: 0 }));
+    update(id, (j) => ({ ...j, ...QUEUED }));
+  }, [update]);
+
+  /** A full run from scratch: the chat and its instructions are dropped. */
+  const startOver = useCallback((id: string) => {
+    update(id, (j) => ({ ...j, ...QUEUED, chat: [], pending: null }));
+  }, [update]);
+
+  /** A chat message about the last result; the server picks the step to restart from. */
+  const ask = useCallback((id: string, message: string) => {
+    const text = message.trim();
+    if (!text) return;
+    update(id, (j) =>
+      j.result?.state && !ACTIVE.includes(j.state)
+        ? { ...j, ...QUEUED, chat: [...j.chat, { role: "user", text }], pending: { kind: "chat", message: text } }
+        : j
+    );
+  }, [update]);
+
+  /** The image model on the last result's numbering, without reading the drawing again. */
+  const aiRedraw = useCallback((id: string) => {
+    update(id, (j) =>
+      j.result?.state && !ACTIVE.includes(j.state) ? { ...j, ...QUEUED, redraw: true, pending: { kind: "redraw" } } : j
+    );
+  }, [update]);
+
+  /** A full run that keeps the chat's instructions (reading notes, roles, added markers, redraw notes). */
+  const rerunWithInstructions = useCallback((id: string) => {
+    update(id, (j) =>
+      j.result?.state && !ACTIVE.includes(j.state) ? { ...j, ...QUEUED, pending: { kind: "rerun" } } : j
+    );
   }, [update]);
 
   const retryFailed = useCallback(() => {
@@ -428,6 +521,10 @@ export function useDiagramQueue(parallel: number, redraw = true) {
     stopJob,
     stopAll,
     retry,
+    startOver,
+    ask,
+    aiRedraw,
+    rerunWithInstructions,
     retryFailed,
     remove,
     clear,
@@ -459,6 +556,12 @@ function withMode(job: DiagramJob, redraw: boolean): DiagramJob {
 /** Waiting for its first run, or holding a numbers-only result while set to AI redraw. */
 export function needsRun(job: DiagramJob): boolean {
   return job.state === "ready" || (job.state === "done" && job.redraw && job.result?.status === "numbers_only");
+}
+
+/** Standing instructions the chat left on this diagram, which "Run again with instructions" keeps. */
+export function hasInstructions(job: DiagramJob): boolean {
+  const s = job.result?.state;
+  return !!s && [s.read_notes, s.redraw_notes, s.role_overrides, s.added_markers].some((list) => list?.length > 0);
 }
 
 /** Staff changed a label of the legend the server returned. */

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import type { DiagramResult } from "@/types";
 import type { DiagramChoice, DiagramJob } from "@/lib/diagram-queue";
-import { MAX_AUTO_RETRIES, exportedImage } from "@/lib/diagram-queue";
+import { MAX_AUTO_RETRIES, exportedImage, hasInstructions } from "@/lib/diagram-queue";
 import { downloadDataUrl, ficheJson, hasNumberingGap, outputName } from "@/lib/diagram-export";
 import { Icon, IconBtn, LoaderDots } from "./Icons";
 import { DiagramBoxes } from "./DiagramBoxes";
+import { DiagramChat } from "./DiagramChat";
 import { ModeSwitch } from "./ModeSwitch";
 
 type Tone = "muted" | "accent" | "green" | "amber" | "red";
@@ -40,10 +41,22 @@ function status(job: DiagramJob): { label: string; tone: Tone } {
   }
 }
 
+// Where a follow-up run starts on the bar, by the step it restarts from.
+const ENTRY_SHARE: Record<string, number> = {
+  answer: 0.9,
+  legend: 0.9,
+  redraw: 0.42,
+  number: 0.38,
+  read: 0.12,
+  orient: 0.04,
+};
+
 // Rough share of the run done at each stage; the redraw loop fills the last half.
 function progressShare(job: DiagramJob): number {
+  if (job.stage === "routed") return ENTRY_SHARE[job.entry ?? ""] ?? 0.05;
   const fixed: Record<string, number> = {
     queued: 0.02,
+    route: 0.03,
     orient: 0.08,
     text: 0.18,
     reread: 0.32,
@@ -122,7 +135,15 @@ function SmallButton({
 interface Props {
   job: DiagramJob;
   now: number;
+  /** Failed or stopped: the same run again, a pending chat message included. */
   onRetry: () => void;
+  /** The whole pipeline from the source, dropping the chat and its instructions. */
+  onStartOver: () => void;
+  onAsk: (message: string) => void;
+  /** The image model on the current numbering, without reading the drawing again. */
+  onAiRedraw: () => void;
+  /** The whole pipeline, keeping the chat's instructions. */
+  onRerunWithInstructions: () => void;
   onStop: () => void;
   onRemove: () => void;
   onEditLabel: (numero: number, label: string) => void;
@@ -156,6 +177,10 @@ export function DiagramCard({
   job,
   now,
   onRetry,
+  onStartOver,
+  onAsk,
+  onAiRedraw,
+  onRerunWithInstructions,
   onStop,
   onRemove,
   onEditLabel,
@@ -180,9 +205,15 @@ export function DiagramCard({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const runAgain = () => {
-    if (edited && !window.confirm("Run this diagram again? Your legend edits will be replaced by the new result.")) return;
-    onRetry();
+  const instructions = hasInstructions(job);
+  const followUp = !!result?.state && !active;
+
+  const startOver = () => {
+    const lost = [edited && "your legend edits", (job.chat.length > 0 || instructions) && "the chat and its instructions"]
+      .filter(Boolean)
+      .join(" and ");
+    if (lost && !window.confirm(`Start over from the source? This drops ${lost}.`)) return;
+    onStartOver();
   };
 
   return (
@@ -258,7 +289,10 @@ export function DiagramCard({
           </IconBtn>
         ) : (
           job.state !== "ready" && (
-            <IconBtn onClick={job.state === "done" ? runAgain : onRetry} title={job.state === "done" ? "Run again" : "Retry"}>
+            <IconBtn
+              onClick={job.state === "done" ? startOver : onRetry}
+              title={job.state === "done" ? "Start over" : job.pending ? "Retry the last request" : "Retry"}
+            >
               <Icon name="refresh" size={13} />
             </IconBtn>
           )
@@ -326,12 +360,34 @@ export function DiagramCard({
         </ul>
       )}
 
-      {job.state === "done" && job.redraw && result?.status === "numbers_only" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
-          <span>Set to AI redraw: the result below has numbers only. Run it again to get the redraw.</span>
-          <SmallButton onClick={runAgain}>
-            <Icon name="refresh" size={12} /> Run again
+      {followUp && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            fontSize: 12.5,
+            color: "var(--text-muted)",
+          }}
+        >
+          {job.redraw && result?.status === "numbers_only" && <span>Set to AI redraw: this result has numbers only.</span>}
+          <SmallButton
+            primary={job.redraw && result?.status === "numbers_only"}
+            onClick={onAiRedraw}
+          >
+            <Icon name="sparkle" size={12} /> {result?.status === "verified" ? "AI redraw again" : "AI redraw"}
           </SmallButton>
+          {instructions && (
+            <SmallButton onClick={onRerunWithInstructions}>
+              <Icon name="refresh" size={12} /> Run again with instructions
+            </SmallButton>
+          )}
+          <span style={{ fontSize: 11.5 }}>
+            {result?.status === "verified"
+              ? "A new redraw of this numbering; the drawing is not read again."
+              : "Redraws this numbering with the image model; the drawing is not read again."}
+          </span>
         </div>
       )}
 
@@ -616,6 +672,10 @@ export function DiagramCard({
             ))}
           </ol>
         </details>
+      )}
+
+      {result && (
+        <DiagramChat turns={job.chat} busy={active} disabled={!result.state} onSend={onAsk} />
       )}
     </div>
   );

@@ -1,7 +1,10 @@
 import type {
   ChatMessage,
   ChatResponse,
+  DiagramChatTurn,
   DiagramEvent,
+  DiagramLegendEntry,
+  DiagramState,
   Flashcard,
   GenerateParams,
   GenerateResponse,
@@ -190,23 +193,15 @@ export function startGenerationStream(
   return () => controller.abort();
 }
 
-/** Number one diagram. `onEnd` fires once the stream closes, whatever it carried;
- *  `onError` gets HTTP and network failures (not the stream's own `error` event).
- *  `redraw: false` returns the numbered source without the AI redraw.
- *  Returns an abort function. */
-export function startDiagramStream(
-  file: File,
+function postDiagramSSE(
+  path: string,
+  form: FormData,
   onEvent: (e: DiagramEvent) => void,
   onError: (err: HttpError) => void,
-  onEnd: () => void,
-  { redraw = true }: { redraw?: boolean } = {}
+  onEnd: () => void
 ): () => void {
   const controller = new AbortController();
-  const form = new FormData();
-  form.append("file", file);
-  form.append("redraw", String(redraw));
-
-  fetchWithBasicAuth(`${BASE}/qa/diagrams`, {
+  fetchWithBasicAuth(`${BASE}${path}`, {
     method: "POST",
     body: form,
     signal: controller.signal,
@@ -229,6 +224,56 @@ export function startDiagramStream(
     });
 
   return () => controller.abort();
+}
+
+/** Number one diagram. `onEnd` fires once the stream closes, whatever it carried;
+ *  `onError` gets HTTP and network failures (not the stream's own `error` event).
+ *  `redraw: false` returns the numbered source without the AI redraw.
+ *  Returns an abort function. */
+export function startDiagramStream(
+  file: File,
+  onEvent: (e: DiagramEvent) => void,
+  onError: (err: HttpError) => void,
+  onEnd: () => void,
+  { redraw = true }: { redraw?: boolean } = {}
+): () => void {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("redraw", String(redraw));
+  return postDiagramSSE("/qa/diagrams", form, onEvent, onError, onEnd);
+}
+
+export interface DiagramRefineArgs {
+  /** `result.state` of the diagram's last run. */
+  state: DiagramState;
+  /** The legend staff see, hand edits included. */
+  legend: DiagramLegendEntry[];
+  redraw: boolean;
+  /** A chat message, with the turns before it… */
+  message?: string;
+  history?: DiagramChatTurn[];
+  /** …or a step to restart from without one: "redraw" (AI-redraw button), "orient" (run again, keeping the
+   *  chat's instructions). */
+  entry?: "redraw" | "orient";
+}
+
+/** A follow-up run on a numbered diagram; same callbacks as `startDiagramStream`. */
+export function startDiagramRefine(
+  file: File,
+  args: DiagramRefineArgs,
+  onEvent: (e: DiagramEvent) => void,
+  onError: (err: HttpError) => void,
+  onEnd: () => void
+): () => void {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("state", JSON.stringify(args.state));
+  form.append("legend", JSON.stringify(args.legend));
+  form.append("redraw", String(args.redraw));
+  if (args.message) form.append("message", args.message);
+  form.append("history", JSON.stringify((args.history ?? []).map(({ role, text }) => ({ role, text }))));
+  if (args.entry) form.append("entry", args.entry);
+  return postDiagramSSE("/qa/diagrams/refine", form, onEvent, onError, onEnd);
 }
 
 /** Render a PDF's pages as JPEG data URLs, one diagram per page. */

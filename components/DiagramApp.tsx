@@ -85,7 +85,8 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
   };
 
   const startPending = () => {
-    const edited = pending.filter(legendEdited).length;
+    // A numbers-only result switched to AI redraw keeps its legend: only fresh runs replace edits.
+    const edited = pending.filter((j) => legendEdited(j) && !j.result?.state).length;
     if (edited && !window.confirm(`Running again replaces your legend edits on ${edited} diagram(s). Continue?`)) return;
     q.startPending();
   };
@@ -356,6 +357,10 @@ export function DiagramApp({ header }: { header?: React.ReactNode } = {}) {
                   job={job}
                   now={q.now}
                   onRetry={() => q.retry(job.id)}
+                  onStartOver={() => q.startOver(job.id)}
+                  onAsk={(message) => q.ask(job.id, message)}
+                  onAiRedraw={() => q.aiRedraw(job.id)}
+                  onRerunWithInstructions={() => q.rerunWithInstructions(job.id)}
                   onStop={() => q.stopJob(job.id)}
                   onRemove={() => {
                     if (job.result && !window.confirm(`Remove ${job.name} and its result?`)) return;
